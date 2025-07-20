@@ -270,7 +270,7 @@ def simulate(inp):
         total_cost       = (cos_df.iloc[t].sum() + acq_df.iloc[t].sum() + serv_df.iloc[t].sum() +
                              gna_ser[t] + tech_req[t] * p['tech_cost'] * tc_eff[t])
         cash_ser[t]      = cash_ser[t-1] + total_rev - total_cost if t > 0 else cash_ser[0]
-    # Aggregated costs
+        # Aggregated costs
     costs_agg = pd.DataFrame({
         'CoS': cos_df.sum(axis=1),
         'Acquisition': acq_df.sum(axis=1),
@@ -278,30 +278,32 @@ def simulate(inp):
         'G&A': gna_ser,
         'Tech': tech_req * p['tech_cost'] * tc_eff
     }, index=idxs)
+
+    # Tech capacity DataFrame
     tech_df = pd.DataFrame({'available': tech_av, 'required': tech_req}, index=idxs)
+
+    # Prepare churn metrics with product effects
     newc_sum = newc.sum(axis=1)
-    denom    = np.where(newc_sum == 0, 1, newc_sum)
-        # Compute base churn metrics
+    denom = np.where(newc_sum == 0, 1, newc_sum)
+    # Base churn
     base_churn1 = (cy1 * active).sum(axis=1) / active.sum(axis=1)
     base_churnP = (cp  * active).sum(axis=1) / active.sum(axis=1)
-    # Compute product adoption effect on churn
+    # Product multipliers
     prod_mults1 = prod['Churn1 Mult'].astype(float).values
     prod_multsP = prod['ChurnP Mult'].astype(float).values
     prod_effect1 = 1 + np.dot(adopt, (prod_mults1 - 1))
     prod_effectP = 1 + np.dot(adopt, (prod_multsP - 1))
-    # Final metrics
+
+    # Final metrics DataFrame
     metrics_df = pd.DataFrame({
         'CAC': acq_df.sum(axis=1) / denom,
         'ARPU': rev_mkt.sum(axis=1) / active.sum(axis=1) * 12,
-        # churn adjusted by product effects
+        'CSC': (serv_df.sum(axis=1) / active.sum(axis=1)) * 12,
         'Churn Y1': base_churn1 * prod_effect1,
         'Churn Post': base_churnP * prod_effectP
     }, index=idxs)
- / denom,
-        'ARPU': rev_mkt.sum(axis=1) / active.sum(axis=1) * 12,
-        'Churn Y1': (cy1 * active).sum(axis=1) / active.sum(axis=1),
-        'Churn Post': (cp * active).sum(axis=1) / active.sum(axis=1)
-    }, index=idxs)
+
+    # Return all outputs
     return rev_mkt, costs_agg, tech_df, cash_ser, metrics_df, cos_df, acq_df, serv_df, active
 
 # Run Simulation & Display
