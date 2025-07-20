@@ -136,7 +136,140 @@ inputs = {'base': base_df.to_dict('list'), 'new': new_df.to_dict('list'), 'prod'
 
 # Simulation function (cohorts, adoption, efficiency, P&L)
 def simulate(inp):
-    # ... full simulate logic unchanged ...
+    base = pd.DataFrame(inp['base'])
+    newm = pd.DataFrame(inp['new'])
+    prod = pd.DataFrame(inp['prod'])
+    effp = pd.DataFrame(inp['eff'])
+    p = inp['params']
+    # Timeline
+    dates = pd.date_range(START_DATE, periods=MONTHS, freq='MS')
+    n = MONTHS
+    m0 = len(base)
+    m1 = len(newm)
+    markets = list(base['Market']) + list(newm['Market'])
+    # Monthly churn
+    churn_y1 = np.concatenate([base['Churn Y1'].astype(float), newm['Churn Y1'].astype(float)])
+    churn_post = np.concatenate([base['Churn Post'].astype(float), newm['Churn Post'].astype(float)])
+    cy1 = 1 - (1 - churn_y1) ** (1/12)
+    cp  = 1 - (1 - churn_post) ** (1/12)
+    # Initialize cohorts
+    cohorts = np.zeros((n, m0 + m1, n))
+    for i in range(m0): cohorts[0, i, 12] = base.at[i, 'Existing Clients']
+    # New clients schedule
+    newc = np.zeros((n, m0 + m1))
+    for i in range(m0):
+        ys = base.loc[i, ['New1','New2','New3','New4','New5']].astype(float).values
+        for yi in range(5): newc[yi*12:(yi+1)*12, i] = ys[yi] / 12
+    for i in range(m1):
+        r = newm.loc[i]
+        idx = (pd.to_datetime(r['Start']).year - START_DATE.year) * 12 + (pd.to_datetime(r['Start']).month - 1)
+        prep = int(r['Prep mo'])
+        ys = r[['New1','New2','New3','New4','New5']].astype(float).values
+        for yi in range(5):
+            s = idx + prep + yi * 12
+            e = min(s + 12, n)
+            if s < n: newc[s:e, m0 + i] = ys[yi] / 12
+    # Simulate cohorts
+    for t in range(1, n):
+        for i in range(m0 + m1):
+            prev = cohorts[t-1, i]
+            curr = np.zeros(n)
+            curr[0] = newc[t, i]
+            for age in range(1, n):
+                rate = cy1[i] if age < 12 else cp[i]
+                curr[age] = prev[age-1] * (1 - rate)
+            cohorts[t, i] = curr
+    active = cohorts.sum(axis=2)
+    # Product adoption
+    adopt = np.zeros((n, len(prod)))
+    for j in range(len(prod)):
+        r = prod.loc[j]
+        idx = (pd.to_datetime(r['Start']).year - START_DATE.year) * 12 + (pd.to_datetime(r['Start']).month - 1)
+        prep = int(r['Prep mo'])
+        ys = r[['Ad1','Ad2','Ad3','Ad4','Ad5']].astype(float).values
+        arr = np.zeros(n)
+        for yi in range(5):
+            s = idx + prep + yi * 12
+            e = min(s + 12, n)
+            if s < n: arr[s:e] = ys[yi] / 12
+        adopt[:, j] = np.cumsum(arr)
+    # Efficiency multipliers
+    eff_active = np.zeros((n, len(effp)))
+    for j in range(len(effp)):
+        r = effp.loc[j]
+        idx = (pd.to_datetime(r['Start']).year - START_DATE.year) * 12 + (pd.to_datetime(r['Start']).month - 1)
+        dur = int(r['Duration'])
+        eff_active[idx:idx+dur, j] = 1
+    cac_eff = np.ones(n)
+    csc_eff = np.ones(n)
+    tc_eff  = np.ones(n)
+    for j in range(len(effp)):
+        mrow = effp.loc[j, ['CAC Mult','CSC Mult','TechCost Mult']].astype(float).values
+        mask = eff_active[:, j] == 1
+        cac_eff[mask] *= mrow[0]
+        csc_eff[mask] *= mrow[1]
+        tc_eff[mask]  *= mrow[2]
+    # Prepare result containers
+    idxs = pd.DatetimeIndex(dates)
+    rev_mkt   = pd.DataFrame(0, index=idxs, columns=markets)
+    cos_df    = pd.DataFrame(0, index=idxs, columns=markets)
+    acq_df    = pd.DataFrame(0, index=idxs, columns=markets)
+    serv_df   = pd.DataFrame(0, index=idxs, columns=markets)
+    tech_av   = np.zeros(n)
+    tech_req  = np.zeros(n)
+    gna_ser   = np.zeros(n)
+    cash_ser  = np.zeros(n)
+    # Initialize
+    gna_month = p['hq_gna'] / 12
+    cash_ser[0] = p['cash']
+    tech_av[0]  = p['tech_units']
+    # Monthly loop
+    for t in range(n):
+        arpu = np.concatenate([base['ARPU'], newm['ARPU']]).astype(float)
+        cac  = np.concatenate([base['CAC'], newm['CAC']]).astype(float)
+        csc  = np.concatenate([base['CSC'], newm['CSC']]).astype(float)
+        for j in range(len(prod)):
+            frac = adopt[t, j]
+            r    = prod.loc[j]
+            arpu += frac * (r['ARPU Mult'] - 1) * arpu
+            cac  += frac * (r['CAC Mult'] - 1) * cac
+            csc  += frac * (r['CSC Mult'] - 1) * csc
+        cac *= cac_eff[t]
+        csc *= csc_eff[t]
+        act = active[t]
+        nc  = newc[t]
+        rev_mkt.iloc[t]   = act * arpu / 12
+        cos_df.iloc[t]    = rev_mkt.iloc[t] * p['cos']
+        acq_df.iloc[t]    = nc * cac
+        serv_df.iloc[t]   = act * csc / 12
+        gna_ser[t]        = gna_month
+        if t > 0:
+            rev_prev = rev_mkt.iloc[t-1].sum()
+            rev_cur  = rev_mkt.iloc[t].sum()
+            growth   = (rev_cur - rev_prev) / max(rev_prev, 1)
+            gna_month *= (1 + p['gna_share'] * growth)
+            tech_av[t] = tech_av[t-1] * (1 + p['tech_share'] * growth)
+        tech_req[t]      = tech_av[t] * p['hq_share']
+        total_rev        = rev_mkt.iloc[t].sum()
+        total_cost       = cos_df.iloc[t].sum() + acq_df.iloc[t].sum() + serv_df.iloc[t].sum() + gna_ser[t] + tech_req[t] * p['tech_cost'] * tc_eff[t]
+        cash_ser[t]      = cash_ser[t-1] + total_rev - total_cost if t > 0 else cash_ser[0]
+    # Aggregated costs
+    costs_agg = pd.DataFrame({
+        'CoS': cos_df.sum(axis=1),
+        'Acquisition': acq_df.sum(axis=1),
+        'Servicing': serv_df.sum(axis=1),
+        'G&A': gna_ser,
+        'Tech': tech_req * p['tech_cost'] * tc_eff
+    }, index=idxs)
+    tech_df = pd.DataFrame({'available': tech_av, 'required': tech_req}, index=idxs)
+    newc_sum = newc.sum(axis=1)
+    denom    = np.where(newc_sum == 0, 1, newc_sum)
+    metrics_df = pd.DataFrame({
+        'CAC': acq_df.sum(axis=1) / denom,
+        'ARPU': rev_mkt.sum(axis=1) / active.sum(axis=1) * 12,
+        'Churn Y1': (cy1 * active).sum(axis=1) / active.sum(axis=1),
+        'Churn Post': (cp * active).sum(axis=1) / active.sum(axis=1)
+    }, index=idxs)
     return rev_mkt, costs_agg, tech_df, cash_ser, metrics_df, cos_df, acq_df, serv_df
 
 # Run Simulation & Display
