@@ -288,10 +288,6 @@ def simulate(inp):
 if st.button('Run Simulation'):
     rev_mkt, costs_agg, tech_df, cash_ser, metrics_df, cos_df, acq_df, serv_df, active = simulate(inputs)
 
-    # Smooth costs and metrics (3-month moving average)
-    costs_agg_sm = costs_agg.rolling(window=3, center=True, min_periods=1).mean()
-    metrics_df_sm = metrics_df.rolling(window=3, center=True, min_periods=1).mean()
-
     # Revenue by Market (stacked area)
     st.subheader('Revenue by Market')
     rev_df = rev_mkt[sel_mkt].reset_index().melt(id_vars='index', var_name='Market', value_name='Revenue')
@@ -302,23 +298,21 @@ if st.button('Run Simulation'):
     ).properties(width='container', height=300)
     st.altair_chart(rev_chart, use_container_width=True)
 
-    # Costs by Market (stacked area, smoothed)
+    # Costs by Market (stacked area)
     st.subheader('Costs by Market')
-    cost_mkt = (cos_df + acq_df + serv_df)[sel_mkt]
-    cost_mkt_sm = cost_mkt.rolling(window=3, center=True, min_periods=1).mean()
-    cost_mkt_df = cost_mkt_sm.reset_index().melt(id_vars='index', var_name='Market', value_name='Cost')
+    cost_mkt_df = (cos_df + acq_df + serv_df)[sel_mkt].reset_index().melt(id_vars='index', var_name='Market', value_name='Cost')
     cost_chart = alt.Chart(cost_mkt_df).mark_area().encode(
-        x='index:T',
+        x=alt.X('index:T', title='Date'),
         y=alt.Y('Cost:Q', stack='zero', title='Cost (USD)'),
         color=alt.Color('Market:N', title='Market')
     ).properties(width='container', height=300)
     st.altair_chart(cost_chart, use_container_width=True)
 
-    # Aggregated Costs Breakdown (stacked area, smoothed)
+    # Aggregated Costs Breakdown (stacked area)
     st.subheader('Aggregated Costs Breakdown')
-    agg_sm = costs_agg_sm.reset_index().melt(id_vars='index', var_name='Cost Type', value_name='Amount')
-    agg_chart = alt.Chart(agg_sm).mark_area().encode(
-        x='index:T',
+    agg_df = costs_agg.reset_index().melt(id_vars='index', var_name='Cost Type', value_name='Amount')
+    agg_chart = alt.Chart(agg_df).mark_area().encode(
+        x=alt.X('index:T', title='Date'),
         y=alt.Y('Amount:Q', stack='zero', title='Amount (USD)'),
         color=alt.Color('Cost Type:N', title='Cost Type')
     ).properties(width='container', height=300)
@@ -328,22 +322,94 @@ if st.button('Run Simulation'):
     st.subheader('Cash Balance')
     st.line_chart(cash_ser)
 
-    # Tech Capacity Breakdown
+        # Tech Capacity Breakdown
     st.subheader('Tech Capacity Breakdown')
-    # ... existing tech breakdown code ...
+    dates_idx = tech_df.index
+    # Build breakdown DataFrame
+    breakdown = pd.DataFrame({'HQ': tech_df['required']}, index=dates_idx)
+    # Existing markets tech usage
+    for i, market in enumerate(base_df['Market']):
+        units = base_df.loc[i, 'Tech/mo']
+        breakdown[market] = units
+        # New markets prep and maintenance
+    for i, market in enumerate(new_df['Market']):
+        row = new_df.loc[i]
+        # Calculate index relative to START_DATE
+        dt = pd.to_datetime(row['Start'])
+        start_idx = (dt.year - START_DATE.year) * 12 + (dt.month - START_DATE.month)
+        arr = np.zeros(len(dates_idx))
+        # Prep phase
+        prep = int(row['Prep mo'])
+        if prep > 0 and start_idx >= 0:
+            end_prep = min(start_idx + prep, len(arr))
+            arr[start_idx:end_prep] = row['Prep Tech/mo']
+        # Maintenance years 1-5
+        for yi in range(1,6):
+            m = row[f'M{yi}']
+            s = start_idx + prep + (yi-1)*12
+            e = min(s + 12, len(arr))
+            if s < len(arr) and s >= 0:
+                arr[s:e] += m
+        breakdown[market] = arr
 
-    # Key Metrics (including CSC, smoothed)
+        # Products prep and maintenance
+    for j, prod_name in enumerate(prod_df['Product']):
+        row = prod_df.loc[j]
+        # Calculate index relative to START_DATE
+        dt = pd.to_datetime(row['Start'])
+        start_idx = (dt.year - START_DATE.year) * 12 + (dt.month - START_DATE.month)
+        arr = np.zeros(len(dates_idx))
+        # Prep phase
+        prep = int(row['Prep mo'])
+        if prep > 0 and start_idx >= 0:
+            end_prep = min(start_idx + prep, len(arr))
+            arr[start_idx:end_prep] = row['Prep Tech/mo']
+        # Maintenance years 1-5
+        for yi in range(1, 6):
+            m = row[f'M{yi}']
+            s = start_idx + prep + (yi-1)*12
+            e = min(s + 12, len(arr))
+            if 0 <= s < len(arr):
+                arr[s:e] += m
+        breakdown[prod_name] = arr
+
+    # Efficiency projects tech usage
+    for k, proj in enumerate(eff_df['Project']):
+        row = eff_df.loc[k]
+        start_idx = (pd.to_datetime(row['Start']).year - START_DATE.year) * 12 + (pd.to_datetime(row['Start']).month - 1)
+        dur = int(row['Duration'])
+        arr = np.zeros(len(dates_idx))
+        end = min(start_idx + dur, len(arr))
+        if start_idx < len(arr):
+            arr[start_idx:end] = row['Tech/mo']
+        breakdown[proj] = arr
+    # Melt and plot
+    tech_long = breakdown.reset_index().melt(id_vars='index', var_name='Component', value_name='Units')
+    area = alt.Chart(tech_long).mark_area().encode(
+        x=alt.X('index:T', title='Date'),
+        y=alt.Y('Units:Q', stack='zero', title='Tech Units Required'),
+        color=alt.Color('Component:N', title='Component')
+    ).properties(width='container', height=300)
+    avail = pd.DataFrame({'index': dates_idx, 'Available': tech_df['available'].values})
+    line = alt.Chart(avail).mark_line(size=2).encode(
+        x=alt.X('index:T', title='Date'),
+        y=alt.Y('Available:Q', title='Tech Units Available')
+    )
+    st.altair_chart(alt.layer(area, line), use_container_width=True)
+
+    # Key Metrics (including CSC)
     st.subheader('Key Metrics')
-    metrics_fin = metrics_df_sm[['CAC','ARPU','CSC']]
+    # Compute CSC metric (annual servicing cost per client)
+    metrics_df['CSC'] = (serv_df.sum(axis=1) / active.sum(axis=1)) * 12
+    metrics_fin = metrics_df[['CAC','ARPU','CSC']]
     st.line_chart(metrics_fin)
 
-    # Churn Metrics (separate chart, smoothed)
+    # Churn Metrics (separate scale)
     st.subheader('Churn Metrics')
-    metrics_churn_sm = metrics_df_sm[['Churn Y1','Churn Post']]
-    st.line_chart(metrics_churn_sm)
+    metrics_churn = metrics_df[['Churn Y1','Churn Post']]
+    st.line_chart(metrics_churn)
 
     # Total Active Clients
     st.subheader('Total Active Clients')
     total_clients = pd.Series(active.sum(axis=1), index=rev_mkt.index)
-    total_clients_sm = total_clients.rolling(window=3, center=True, min_periods=1).mean()
-    st.line_chart(total_clients_sm)
+    st.line_chart(total_clients)
