@@ -6,7 +6,7 @@ Simulator to be hosted on a webpage with streamlit, coded in Python.
 We are contemplating a few projects to grow faster. Typically 3 kinds of projects:
 - Launching our core product (a "Business Account" for SMEs) in new markets. To be able to serve more SMEs.
 - Launching new Products (in all markets where we operate). Always focused on SMEs -> Goal is to lower our CAC, grow ARPU and decrease churn across markets where we'll operate.
-- Efficiency increase projects - to lower our CAC and CSC (Customer Servicing Costs). 
+- Efficiency increase projects - to lower our CAC, lower our CSC (Customer Servicing Costs), and lower our cost per Tech bandwidth unit.
 
 Each of these 3 types of projects has different types of parameters.
 For new markets: 
