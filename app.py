@@ -322,6 +322,12 @@ if st.button('Run Simulation'):
     # HQ requirement
     req_hq = tech_df['required']
     breakdown = pd.DataFrame({'HQ': req_hq}, index=dates_idx)
+        # Include existing markets tech requirement
+    for i, market in enumerate(base_df['Market']):
+        # constant monthly tech usage per existing market
+        units = base_df.loc[i, 'Tech/mo']
+        breakdown[market] = np.full(len(dates_idx), units)
+
     # New markets maintenance
     for i, market in enumerate(new_df['Market']):
         # Determine start and monthly maintenance values
@@ -335,6 +341,7 @@ if st.button('Run Simulation'):
             e = min(s + 12, len(arr))
             if s < len(arr): arr[s:e] = maint_vals[yi]
         breakdown[market] = arr
+
     # Product maintenance
     for j, prod_name in enumerate(prod_df['Product']):
         row = prod_df.loc[j]
