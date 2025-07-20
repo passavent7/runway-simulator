@@ -323,9 +323,11 @@ if st.button('Run Simulation'):
     ).properties(width='container', height=300)
     st.altair_chart(cost_chart, use_container_width=True)
 
-    # Aggregated Costs Breakdown
+        # Aggregated Costs Breakdown (smoothed)
     st.subheader('Aggregated Costs Breakdown')
-    agg_df = costs_agg.reset_index().melt(id_vars='index', var_name='Cost Type', value_name='Amount')
+    # apply rolling average to each cost type
+    smoothed_agg = costs_agg.rolling(window=smoothing_window, min_periods=1).mean()
+    agg_df = smoothed_agg.reset_index().melt(id_vars='index', var_name='Cost Type', value_name='Amount')
     agg_chart = alt.Chart(agg_df).mark_area().encode(
         x=alt.X('index:T', title='Date'),
         y=alt.Y('Amount:Q', title='Amount (USD)', stack='zero'),
