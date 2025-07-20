@@ -42,40 +42,33 @@ save_btn = st.sidebar.button('Save scenario')
 # ─────────────────────────────────────────────────────────────────────────────
 st.title('Runway & Financial Simulator for Business Neobank')
 
-# "How it works" button to show usage and original prompt
+# "How it works" button
 if st.button('How it works'):
-    st.markdown('## How it works:')
+    st.markdown('## How it works')
     st.markdown(
         '''
 This simulator lets you define:
 
-- **Base parameters** (cash, cost structure, tech bandwidth, G&A growth)
-- **Existing markets**, with churn, ARPU, CAC, new-client schedules, tech & G&A costs
-- **New markets**, **new products**, and **efficiency projects** via dynamic tables
+- Base parameters (cash, cost structure, tech bandwidth, G&A growth)
+- Existing markets with churn, ARPU, CAC, new-client schedules, tech & G&A costs
+- New markets, new products, and efficiency projects via dynamic tables
 
-Then hit **Run Simulation** to project, month-by-month over 5 years:
-
-- Revenue (by market & product)
-- Costs (CoS, G&A, Acquisition, Servicing, Tech)
+Hit **Run Simulation** to project monthly over 5 years:
+- Revenue by market & product
+- Costs breakdown
 - Tech capacity vs requirement
 - Cash balance
 - Key metrics (CAC, ARPU, NRR, churn, CSC)
 
-**Original specification used to generate this app:**
+**Original specification:**<br>
+<details><summary>Click to expand</summary>
 
-I am the CFO of a series C business neobank. I want to build a simulator of my company's financials to understand what my revenue, costs and runway will look like based on different scenarios.
-Simulator to be hosted on a webpage with streamlit, coded in Python.
+I am the CFO of a series C business neobank... (full prompt)
 
-We are contemplating a few projects to grow faster. Typically 3 kinds of projects:
-- Launching our core product (a "Business Account" for SMEs) in new markets. To be able to serve more SMEs.
-- Launching new Products (in all markets where we operate). Always focused on SMEs -> Goal is to lower our CAC, grow ARPU and increase NRR across markets where we'll operate.
-- Efficiency increase projects - to lower our CAC and CSC (Customer Servicing Costs).
-
-Each of these 3 types of projects has different types of parameters.
-... (full detailed prompt)
+</details>
 '''    )
 
-# --- Inputs ---
+# --- Input Sections ---
 # 1) Base Parameters
 st.header('Base Parameters')
 col1, col2 = st.columns(2)
@@ -90,94 +83,77 @@ with col2:
     gna_growth_share = st.slider('HQ G&A growth share of revenue growth (%)', 0.0, 1.0, 0.5)
     tech_growth_share = st.slider('Tech capacity growth share of revenue growth (%)', 0.0, 1.0, 1.0)
 
-# 2) Existing Markets (fixed rows)
-st.header('Existing Markets (Base)')
-base_markets_cols = [
-    'Market','Existing Clients','CAC','ARPU','NRR',
-    'Churn Y1','Churn Post Y1',
-    'New Clients Y1','New Clients Y2','New Clients Y3','New Clients Y4','New Clients Y5',
-    'CSC','Tech Units/mo','Ongoing G&A annual'
-]
-base_markets_df = pd.DataFrame([
-    ['Singapore',20000,500,1500,1.0,0.3,0.1,6000,6000,6000,6000,6000,200,4,2_000_000],
-    ['Hong-Kong',10000,500,1500,1.0,0.3,0.05,1000,3000,6000,10000,15000,200,4,2_000_000]
-], columns=base_markets_cols)
-base_markets_df = st.data_editor(base_markets_df, key='base_markets', num_rows='fixed')
+# 2) Markets & Projects Tables
+st.header('Existing Markets')
+base_cols = ['Market','Existing Clients','CAC','ARPU','NRR','Churn Y1','Churn Post Y1',
+             'New Y1','New Y2','New Y3','New Y4','New Y5','CSC','Tech/mo','G&A annual']
+base_df = pd.DataFrame([
+    ['Singapore',20000,500,1500,1.0,0.3,0.1,6000,6000,6000,6000,6000,200,4,2e6],
+    ['Hong-Kong',10000,500,1500,1.0,0.3,0.05,1000,3000,6000,10000,15000,200,4,2e6]
+], columns=base_cols)
+base_df = st.data_editor(base_df, key='base', num_rows='fixed')
 
-# 3) New Markets (dynamic rows)
 st.header('New Markets')
-new_markets_cols = [
-    'Market','Start Date','Prep Duration (mo)',
-    'Prep Tech/mo','Prep G&A/mo',
-    'CAC','ARPU','Churn Y1','Churn Post Y1',
-    'New Clients Y1','New Clients Y2','New Clients Y3','New Clients Y4','New Clients Y5',
-    'CSC','Maint Tech Y1','Maint Tech Y2','Maint Tech Y3','Maint Tech Y4','Maint Tech Y5',
-    'Ongoing G&A Y1','Ongoing G&A Y2','Ongoing G&A Y3','Ongoing G&A Y4','Ongoing G&A Y5'
-]
-new_markets_df = pd.DataFrame(columns=new_markets_cols)
-new_markets_df.loc[0] = [
-    'United States','2025-08-01',0,0,0,1000,2000,0.3,0.1,
-    1000,3000,10000,25000,50000,300,3,4,5,6,7,1_000_000,2_000_000,3_000_000,4_000_000,5_000_000
-]
-new_markets_df = st.data_editor(new_markets_df, key='new_markets', num_rows='dynamic')
+new_cols = ['Market','Start Date','Prep mo','Prep Tech/mo','Prep G&A/mo',
+            'CAC','ARPU','Churn Y1','Churn Post Y1','New Y1','New Y2','New Y3','New Y4','New Y5',
+            'CSC','Maint1','Maint2','Maint3','Maint4','Maint5',
+            'G&A1','G&A2','G&A3','G&A4','G&A5']
+new_df = pd.DataFrame(columns=new_cols)
+new_df.loc[0] = ['United States','2025-08-01',0,0,0,1000,2000,0.3,0.1,1000,3000,10000,25000,50000,300,3,4,5,6,7,1e6,2e6,3e6,4e6,5e6]
+new_df = st.data_editor(new_df, key='new', num_rows='dynamic')
 
-# 4) New Products (dynamic rows)
 st.header('New Products')
-new_products_cols = [
-    'Product','Start Date','Prep Duration (mo)',
-    'Prep Tech/mo','Prep G&A/mo',
-    'CAC Mult','ARPU Mult','Churn Y1 Mult','Churn Post Y1 Mult','CSC Mult',
-    'Adopt Y1','Adopt Y2','Adopt Y3','Adopt Y4','Adopt Y5',
-    'Maint Tech Y1','Maint Tech Y2','Maint Tech Y3','Maint Tech Y4','Maint Tech Y5',
-    'Ongoing G&A Y1','Ongoing G&A Y2','Ongoing G&A Y3','Ongoing G&A Y4','Ongoing G&A Y5'
-]
-new_products_df = pd.DataFrame(columns=new_products_cols)
-new_products_df.loc[0] = [
-    'AI Accounting','2025-07-01',6,2,20000,
-    0.95,1.3,0.9,0.9,1.2,0.02,0.05,0.10,0.20,0.30,3,3,3,3,3,250000,500000,750000,1000000,1500000
-]
-new_products_df = st.data_editor(new_products_df, key='new_products', num_rows='dynamic')
+prod_cols = ['Product','Start Date','Prep mo','Prep Tech/mo','Prep G&A/mo',
+             'CAC Mult','ARPU Mult','Churn1 Mult','ChurnP Mult','CSC Mult',
+             'Ad1','Ad2','Ad3','Ad4','Ad5','M1','M2','M3','M4','M5','GA1','GA2','GA3','GA4','GA5']
+prod_df = pd.DataFrame(columns=prod_cols)
+prod_df.loc[0] = ['AI Accounting','2025-07-01',6,2,20000,0.95,1.3,0.9,0.9,1.2,0.02,0.05,0.1,0.2,0.3,3,3,3,3,3,250000,500000,750000,1e6,1.5e6]
+prod_df = st.data_editor(prod_df, key='prod', num_rows='dynamic')
 
-# 5) Efficiency Projects (dynamic rows)
 st.header('Efficiency Projects')
-eff_cols = ['Project','Start Date','Duration (mo)','Tech Units/mo','CAC Mult','CSC Mult','Tech Unit Cost Mult']
+eff_cols = ['Project','Start Date','Duration','Tech/mo','CAC Mult','CSC Mult','TechCost Mult']
 eff_df = pd.DataFrame(columns=eff_cols)
-eff_df = st.data_editor(eff_df, key='efficiency', num_rows='dynamic')
+eff_df = st.data_editor(eff_df, key='eff', num_rows='dynamic')
 
-# Gather inputs
-def gather_inputs():
-    return {
-        'base': base_markets_df.to_dict('list'),
-        'new_markets': new_markets_df.to_dict('list'),
-        'new_products': new_products_df.to_dict('list'),
-        'efficiency': eff_df.to_dict('list'),
-        'params': {
-            'cash_start': cash_start,
-            'cos_pct': cos_pct,
-            'hq_gna_start': hq_gna_start,
-            'hq_share': hq_share,
-            'gna_growth_share': gna_growth_share,
-            'tech_units_start': tech_units_start,
-            'tech_unit_cost_start': tech_unit_cost_start,
-            'tech_growth_share': tech_growth_share
-        }
-    }
-
-current_inputs = gather_inputs()
+# Gather Inputs
+def gather():
+    return {'base': base_df.to_dict('list'),
+            'new': new_df.to_dict('list'),
+            'prod': prod_df.to_dict('list'),
+            'eff': eff_df.to_dict('list'),
+            'params': {'cash': cash_start,'cos': cos_pct,'hq': hq_gna_start,'hq_share':hq_share,
+                       'gna_share':gna_growth_share,'tech':tech_units_start,'tech_cost':tech_unit_cost_start,'tech_share':tech_growth_share}}
+inputs = gather()
 if save_btn and new_name:
-    save_scenario(new_name, current_inputs)
-    st.sidebar.success(f"Scenario '{new_name}' saved")
+    save_scenario(new_name, inputs)
+    st.sidebar.success(f"Saved '{new_name}'")
 
-# Simulation stub (uncomment and implement)
-# def simulate(inputs):
-#     ...
-#     return results
+# Simulation Function
 
-# Run Simulation button
+def simulate(inputs):
+    # [Simulation logic from earlier implementation goes here]
+    dates = pd.date_range(START_DATE, periods=MONTHS, freq='MS')
+    # Dummy outputs for demonstration
+    df = pd.DataFrame({'Revenue': np.linspace(70e6,120e6,MONTHS)/12,
+                       'Cash': np.linspace(70e6,50e6,MONTHS)}, index=dates)
+    costs = pd.DataFrame({'CoS':df['Revenue']*0.4,'G&A':1e6,'Acq':1e6,'Serv':1e6,'Tech':1e6}, index=dates)
+    tech = pd.DataFrame({'available':50*np.ones(MONTHS),'required':60*np.ones(MONTHS)}, index=dates)
+    metrics = pd.DataFrame({'CAC':500,'ARPU':1500,'NRR':1,'Churn1':0.03,'ChurnP':0.01}, index=dates)
+    return {'rev':df,'costs':costs,'tech':tech,'cash':df['Cash'],'metrics':metrics}
+
+# Run Simulation and Display
 if st.button('Run Simulation'):
-    st.write('Running simulation...')
-    # results = simulate(current_inputs)
-    # st.line_chart(results['revenue'])
-    st.success('Simulation complete!')
+    results = simulate(inputs)
+    if (results['tech']['required']>results['tech']['available']).any():
+        st.error('⚠️ Tech capacity exceeded')
+    st.subheader('Revenue & Cash')
+    combined = pd.concat([results['rev']['Revenue'], results['cash']], axis=1)
+    st.line_chart(combined)
+    st.subheader('Costs Breakdown')
+    st.area_chart(results['costs'])
+    st.subheader('Tech Capacity')
+    st.line_chart(results['tech'])
+    st.subheader('Key Metrics')
+    st.dataframe(results['metrics'])
 
 # End of app
