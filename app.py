@@ -33,10 +33,7 @@ def save_scenario(name, data):
 st.sidebar.title('Scenario')
 scenarios = load_scenarios()
 choice = st.sidebar.selectbox('Load existing scenario', ['(new)'] + list(scenarios.keys()))
-if choice != '(new)':
-    scenario_data = scenarios[choice]
-else:
-    scenario_data = None
+scenario_data = scenarios[choice] if choice != '(new)' else None
 new_name = st.sidebar.text_input('Save scenario as', '')
 save_btn = st.sidebar.button('Save scenario')
 
@@ -76,8 +73,10 @@ base_markets_df = pd.DataFrame(
         ['Hong-Kong', 10000, 500, 1500, 1.0, 0.3, 0.05, 1000,3000,6000,10000,15000, 200, 4, 2_000_000]
     ], columns=base_markets_cols
 )
+# Use st.data_editor without num_rows kwarg
 base_markets_df = st.data_editor(
-    base_markets_df, num_rows='fixed', key='base_markets',
+    base_markets_df,
+    key='base_markets',
     help='Core markets where we are live. Churn and new clients per year.'
 )
 
@@ -93,7 +92,6 @@ new_markets_cols = [
     'Ongoing G&A Y1','Ongoing G&A Y2','Ongoing G&A Y3','Ongoing G&A Y4','Ongoing G&A Y5'
 ]
 new_markets_df = pd.DataFrame(columns=new_markets_cols)
-# prefill United States
 new_markets_df.loc[0] = [
     'United States', '2025-08-01', 0,
     0, 0,
@@ -104,7 +102,8 @@ new_markets_df.loc[0] = [
     1_000_000,2_000_000,3_000_000,4_000_000,5_000_000
 ]
 new_markets_df = st.data_editor(
-    new_markets_df, key='new_markets',
+    new_markets_df,
+    key='new_markets',
     help='Launch parameters for new regions. New clients per year spread evenly.'
 )
 
@@ -128,7 +127,8 @@ new_products_df.loc[0] = [
     250000,500000,750000,1000000,1500000
 ]
 new_products_df = st.data_editor(
-    new_products_df, key='new_products',
+    new_products_df,
+    key='new_products',
     help='Parameters for product launches. Adoption as fraction of base clients.'
 )
 
@@ -140,7 +140,9 @@ eff_cols = [
 ]
 eff_df = pd.DataFrame(columns=eff_cols)
 eff_df = st.data_editor(
-    eff_df, key='efficiency', help='Bets to lower CAC, CSC, and tech cost.'
+    eff_df,
+    key='efficiency',
+    help='Bets to lower CAC, CSC, and tech cost.'
 )
 
 # Gather inputs for saving or simulation
@@ -182,4 +184,4 @@ if st.button('Run Simulation'):
         results = simulate(current_inputs)
     st.success('Simulation complete!')
 
-    # [display logic unchanged…]
+    # [display logic unchanged...]
