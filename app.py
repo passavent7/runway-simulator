@@ -157,4 +157,47 @@ def simulate(inp):
 
     # Monthly churn rates
     churn_y1 = np.concatenate([base['Churn Y1'].astype(float), newm['Churn Y1'].astype(float)])
-    churn_post = np.concatenate([base['Churn Post']\
+    churn_post = np.concatenate([base['Churn Post'].astype(float), newm['Churn Post'].astype(float)])
+    cy1 = 1 - (1 - churn_y1) ** (1/12)
+    cp = 1 - (1 - churn_post) ** (1/12)
+
+    # Initialize cohorts
+    cohorts = np.zeros((n, m0 + m1, n))
+    for i in range(m0):
+        cohorts[0, i, 12] = base.at[i, 'Existing Clients']
+
+    # New clients schedule
+    newc = np.zeros((n, m0 + m1))
+    for i in range(m0):
+        ys = base.loc[i, ['New1','New2','New3','New4','New5']].astype(float).values
+        for yi in range(5):
+            newc[yi*12:(yi+1)*12, i] = ys[yi] / 12
+    for i in range(m1):
+        r = newm.loc[i]
+        idx = (pd.to_datetime(r['Start']).year - START_DATE.year) * 12 + pd.to_datetime(r['Start']).month - 1
+        prep = int(r['Prep mo'])
+        ys = r[['New1','New2','New3','New4','New5']].astype(float).values
+        for yi in range(5):
+            s = idx + prep + yi * 12
+            e = min(s + 12, n)
+            if s < n:
+                newc[s:e, m0 + i] = ys[yi] / 12
+
+    # Cohort simulation
+    for t in range(1, n):
+        for i in range(m0 + m1):
+            prev = cohorts[t-1, i]
+            curr = np.zeros(n)
+            curr[0] = newc[t, i]
+            for age in range(1, n):
+                rate = cy1[i] if age < 12 else cp[i]
+                curr[age] = prev[age-1] * (1 - rate)
+            curr[n-1] += prev[n-1] * (1 - cp[i])
+            cohorts[t, i] = curr
+    active = cohorts.sum(axis=2)
+
+    # Product adoption
+    adopt = np.zeros((n, len(prod)))
+    for j in range(len(prod)):
+        r = prod.loc[j]
+        idx = (pd.to_datetime(r['Start']).year - START_DATE.year) * 12 + pd.to_datetime
