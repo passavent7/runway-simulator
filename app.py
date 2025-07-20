@@ -73,9 +73,11 @@ base_markets_df = pd.DataFrame(
         ['Hong-Kong', 10000, 500, 1500, 1.0, 0.3, 0.05, 1000,3000,6000,10000,15000, 200, 4, 2_000_000]
     ], columns=base_markets_cols
 )
+# Fixed row count for base markets
 base_markets_df = st.data_editor(
     base_markets_df,
-    key='base_markets'
+    key='base_markets',
+    num_rows='fixed'
 )
 
 # 3) New Markets
@@ -99,9 +101,11 @@ new_markets_df.loc[0] = [
     3,4,5,6,7,
     1_000_000,2_000_000,3_000_000,4_000_000,5_000_000
 ]
+# Dynamic row count allows adding/removing markets
 new_markets_df = st.data_editor(
     new_markets_df,
-    key='new_markets'
+    key='new_markets',
+    num_rows='dynamic'
 )
 
 # 4) New Products
@@ -123,9 +127,11 @@ new_products_df.loc[0] = [
     3,3,3,3,3,
     250000,500000,750000,1000000,1500000
 ]
+# Dynamic row count allows adding/removing products
 new_products_df = st.data_editor(
     new_products_df,
-    key='new_products'
+    key='new_products',
+    num_rows='dynamic'
 )
 
 # 5) Efficiency Projects
@@ -137,7 +143,8 @@ eff_cols = [
 eff_df = pd.DataFrame(columns=eff_cols)
 eff_df = st.data_editor(
     eff_df,
-    key='efficiency'
+    key='efficiency',
+    num_rows='dynamic'
 )
 
 # Gather inputs for saving or simulation
