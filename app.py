@@ -169,14 +169,20 @@ def simulate(inp):
             curr[n-1]+=prev[n-1]*(1-cp[i]); cohorts[t,i]=curr
     active=cohorts.sum(axis=2)
     # product adoption
-    adopt=np.zeros((n,len(prod)))
+    adopt = np.zeros((n, len(prod)))
     for j in range(len(prod)):
-        r=prod.loc[j]; idx=(pd.to_datetime(r['Start']).year-START_DATE.year)*12+(pd.to_datetime(r['Start']).month-1)
-        prep=int(r['Prep mo']); ys=r[['Ad1','Ad2','Ad3','Ad4','Ad5']].astype(float).values
-        arr=np.zeros(n)
-        for yi in range(5): s=idx+prep+yi*12; e=min(s+12,n);
-            if s<n: arr[s:e]=ys[yi]/12
-        adopt[:,j]=np.cumsum(arr)
+        r = prod.loc[j]
+        idx = (pd.to_datetime(r['Start']).year - START_DATE.year) * 12 + (pd.to_datetime(r['Start']).month - 1)
+        prep = int(r['Prep mo'])
+        ys = r[['Ad1','Ad2','Ad3','Ad4','Ad5']].astype(float).values
+        arr = np.zeros(n)
+        for yi in range(5):
+            s = idx + prep + yi * 12
+            e = min(s + 12, n)
+            if s < n:
+                arr[s:e] = ys[yi] / 12
+        adopt[:, j] = np.cumsum(arr)
+
     # efficiency
     eff_active=np.zeros((n,len(effp)))
     for j in range(len(effp)):
