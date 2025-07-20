@@ -1,150 +1,128 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
-import plotly.graph_objects as go
 import json
 
-# --- App Title ---
-st.title("📊 Startup Runway & Project Simulator")
+st.set_page_config(page_title="Startup Runway Simulator", layout="wide")
+st.title("🚀 Startup Runway Simulator")
 
-# --- Sidebar: Core Inputs ---
-st.sidebar.header("💰 Core Business Inputs")
-cash_on_hand = st.sidebar.number_input("Initial Cash on Hand ($M)", value=50.0, step=1.0)
-burn_rate = st.sidebar.number_input("Core Monthly Burn ($M)", value=1.3, step=0.1)
-arr = st.sidebar.number_input("Current ARR ($M)", value=70.0, step=1.0)
-core_growth_rate = st.sidebar.slider("Core ARR Growth Rate (YoY %)", 0, 100, 30)
-tech_bandwidth_total = 100
-tech_reserved_core = 50
-months = st.sidebar.slider("Simulation Duration (months)", 6, 60, 36)
+# --- Core Parameters ---
+st.sidebar.header("Core Settings")
+cash_on_hand = st.sidebar.number_input("Cash on hand ($M)", value=50.0, step=1.0) * 1e6
+core_burn = st.sidebar.number_input("Core monthly burn ($M)", value=1.3, step=0.1) * 1e6
+core_arr = st.sidebar.number_input("Core ARR ($M)", value=70.0, step=1.0) * 1e6
+core_growth = st.sidebar.slider("Core ARR Growth (YoY %)", min_value=0, max_value=100, value=30)
+tech_capacity = st.sidebar.slider("Total Tech Bandwidth (%)", min_value=0, max_value=100, value=100)
+lead_capacity = st.sidebar.slider("Total Leadership Bandwidth (%)", min_value=0, max_value=100, value=100)
 
-# --- Default Project Types ---
-def get_project_types():
-    return {
-        "Small Bet": dict(cost=0.12, duration=6, prob=0.5, payoff=0.5, tech=5, growth=50),
-        "Medium Bet": dict(cost=0.24, duration=12, prob=0.5, payoff=1.0, tech=10, growth=50),
-        "Big Bet": dict(cost=0.48, duration=24, prob=0.5, payoff=2.0, tech=20, growth=50)
-    }
+# --- Bet Definitions ---
+st.sidebar.header("Bet Definitions")
+project_types = {
+    "Small Bet": {"cost": 120_000, "duration": 6, "success_prob": 0.5, "payoff": 500_000, "tech": 5, "lead": 5, "growth": 50},
+    "Medium Bet": {"cost": 240_000, "duration": 6, "success_prob": 0.5, "payoff": 1_000_000, "tech": 10, "lead": 10, "growth": 50},
+    "Big Bet": {"cost": 480_000, "duration": 6, "success_prob": 0.5, "payoff": 2_000_000, "tech": 20, "lead": 20, "growth": 50},
+}
 
-project_types = get_project_types()
+# --- Scenario Load ---
+with st.sidebar.expander("Load Scenario JSON"):
+    scenario_json = st.text_area("Paste scenario JSON here")
+    if st.button("Load Scenario"):
+        try:
+            parsed = json.loads(scenario_json)
+            cash_on_hand = parsed['cash']
+            core_burn = parsed['burn']
+            core_arr = parsed['arr']
+            core_growth = parsed['core_growth']
+            tech_capacity = parsed['tech_capacity']
+            lead_capacity = parsed['lead_capacity']
+            st.success("Scenario loaded!")
+        except:
+            st.error("Invalid JSON")
 
-# --- Scenario Save/Load ---
-scenario_json = st.sidebar.text_area("📥 Paste Scenario JSON to Load (optional)")
-
-project_df = pd.DataFrame(columns=["Project Name", "Type", "Start Month"])
-
-if scenario_json:
-    try:
-        scenario = json.loads(scenario_json)
-        project_df = pd.DataFrame(scenario['projects'])
-        cash_on_hand = scenario['cash']
-        burn_rate = scenario['burn']
-        arr = scenario['arr']
-        core_growth_rate = scenario['growth']
-        months = scenario['months']
-        st.success("Scenario loaded successfully!")
-    except Exception as e:
-        st.error(f"Failed to load scenario: {e}")
-
-# --- Project Planning Table ---
-st.subheader("🧩 Project Planning Table")
-def default_projects():
+# --- Editable Project Table ---
+st.subheader("📋 Project Planning")
+def default_df():
     return pd.DataFrame([
-        {"Project Name": "Project A", "Type": "Small Bet", "Start Month": 0},
-        {"Project Name": "Project B", "Type": "Medium Bet", "Start Month": 3},
-        {"Project Name": "Project C", "Type": "Big Bet", "Start Month": 6},
+        {"Project": "New Market A", "Type": "Small Bet", "Start Month": 1},
+        {"Project": "New Product B", "Type": "Medium Bet", "Start Month": 3},
     ])
 
-if project_df.empty:
-    project_df = default_projects()
+project_df = st.session_state.get("project_df", default_df())
 
 edited_df = st.data_editor(
     project_df,
     num_rows="dynamic",
     use_container_width=True,
-    column_config={"Type": st.column_config.SelectboxColumn(options=list(project_types.keys()))}
+    column_config={
+        "Type": st.column_config.SelectboxColumn("Type", options=list(project_types.keys())),
+        "Start Month": st.column_config.NumberColumn("Start Month", min_value=0, step=1),
+    }
 )
 
-# --- Save Scenario ---
-if st.button("💾 Download Scenario as JSON"):
-    scenario = {
-        "cash": cash_on_hand,
-        "burn": burn_rate,
-        "arr": arr,
-        "growth": core_growth_rate,
-        "months": months,
-        "projects": edited_df.to_dict(orient="records")
-    }
-    st.download_button("📥 Download JSON", json.dumps(scenario, indent=2), file_name="scenario.json")
-
-# --- Simulation Logic ---
-def simulate():
-    monthly_cash = []
-    monthly_revenue = []
-    monthly_burn = []
-    tech_used = []
-    
-    cash = cash_on_hand
-    revenue = arr / 12
-    
-    project_instances = []
-    for _, row in edited_df.iterrows():
-        p_type = project_types[row['Type']].copy()
-        p_type['name'] = row['Project Name']
-        p_type['type'] = row['Type']
-        p_type['start_month'] = int(row['Start Month'])
-        p_type['active'] = True
-        p_type['month'] = 0
-        project_instances.append(p_type)
-
-    for month in range(months):
-        burn = burn_rate
-        tech_this_month = tech_reserved_core
-        rev_this_month = revenue * ((1 + core_growth_rate/100) ** (month/12))
-
-        for p in project_instances:
-            if not p['active'] or month < p['start_month']:
-                continue
-            if p['month'] < p['duration']:
-                burn += p['cost']
-                tech_this_month += p['tech']
-                p['month'] += 1
-            elif p['month'] == p['duration']:
-                if p['prob'] >= 1.0:
-                    rev_this_month += p['payoff'] / 12 * ((1 + p['growth']/100) ** (month/12))
-                p['active'] = False
-
-        if tech_this_month > tech_bandwidth_total:
-            st.error(f"⚠️ Month {month+1}: Tech bandwidth exceeded ({tech_this_month}%)")
-
-        cash -= burn
-        if cash < 0:
-            st.warning(f"💸 Cash out in month {month+1}")
-            break
-
-        monthly_cash.append(cash)
-        monthly_burn.append(burn)
-        monthly_revenue.append(rev_this_month)
-        tech_used.append(tech_this_month)
-
-    return monthly_cash, monthly_burn, monthly_revenue, tech_used
+st.session_state["project_df"] = edited_df
 
 # --- Run Simulation ---
-if st.button("▶️ Run Simulation"):
-    cash, burn, rev, tech = simulate()
-    months_range = list(range(1, len(cash)+1))
+def simulate():
+    cash = []
+    burn = []
+    revenue = []
+    tech_used = []
+    lead_used = []
 
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(x=months_range, y=cash, mode='lines+markers', name='Cash Remaining ($M)'))
-    fig.add_trace(go.Scatter(x=months_range, y=burn, mode='lines', name='Monthly Burn ($M)'))
-    fig.add_trace(go.Scatter(x=months_range, y=rev, mode='lines', name='Monthly Revenue ($M)'))
-    st.plotly_chart(fig, use_container_width=True)
+    projects = []
+    for _, row in edited_df.iterrows():
+        p_type_name = row['Type']
+        if p_type_name not in project_types:
+            st.warning(f"Skipping unknown project type: {p_type_name}")
+            continue
 
-    export_df = pd.DataFrame({
-        'Month': months_range,
-        'Cash Remaining ($M)': cash,
-        'Monthly Burn ($M)': burn,
-        'Monthly Revenue ($M)': rev,
-        'Tech Bandwidth Used (%)': tech[:len(months_range)]
-    })
+        p_type = project_types[p_type_name].copy()
+        projects.append({**p_type, "start": int(row['Start Month'])})
 
-    st.download_button("📤 Export Scenario as CSV", export_df.to_csv(index=False), file_name="runway_simulation.csv")
+    max_months = 60
+    current_cash = cash_on_hand
+    current_arr = core_arr
+
+    for month in range(max_months):
+        monthly_burn = core_burn
+        tech_this_month = 0
+        lead_this_month = 0
+        cash_in = 0
+
+        for p in projects:
+            if p['start'] <= month < p['start'] + p['duration']:
+                monthly_burn += p['cost']
+                tech_this_month += p['tech']
+                lead_this_month += p['lead']
+
+            if month == p['start'] + p['duration']:
+                cash_in += p['payoff'] * p['success_prob']
+
+        current_cash = current_cash - monthly_burn + (cash_in + current_arr / 12)
+        current_arr *= (1 + core_growth / 12 / 100)
+
+        cash.append(current_cash)
+        burn.append(monthly_burn)
+        revenue.append(current_arr / 12)
+        tech_used.append(tech_this_month)
+        lead_used.append(lead_this_month)
+
+    return cash, burn, revenue, tech_used, lead_used
+
+cash, burn, rev, tech_used, lead_used = simulate()
+
+# --- Charts ---
+st.subheader("📊 Financial Projections")
+st.line_chart({"Cash Balance": cash, "Burn": burn, "Revenue": rev})
+st.line_chart({"Tech Used (%)": tech_used, "Leadership Used (%)": lead_used})
+
+# --- Save Scenario ---
+with st.sidebar.expander("Save Scenario"):
+    scenario = {
+        "cash": cash_on_hand,
+        "burn": core_burn,
+        "arr": core_arr,
+        "core_growth": core_growth,
+        "tech_capacity": tech_capacity,
+        "lead_capacity": lead_capacity
+    }
+    st.code(json.dumps(scenario, indent=2), language="json")
