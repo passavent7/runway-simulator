@@ -1,150 +1,171 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import plotly.graph_objects as go
-import json
+from datetime import date, timedelta
+import altair as alt
 
-# --- App Title ---
-st.title("📊 Startup Runway & Project Simulator")
+# -----------------------
+# Helper functions
+# -----------------------
 
-# --- Sidebar: Core Inputs ---
-st.sidebar.header("💰 Core Business Inputs")
-cash_on_hand = st.sidebar.number_input("Initial Cash on Hand ($M)", value=50.0, step=1.0)
-burn_rate = st.sidebar.number_input("Core Monthly Burn ($M)", value=1.3, step=0.1)
-arr = st.sidebar.number_input("Current ARR ($M)", value=70.0, step=1.0)
-core_growth_rate = st.sidebar.slider("Core ARR Growth Rate (YoY %)", 0, 100, 30)
-tech_bandwidth_total = 100
-tech_reserved_core = 50
-months = st.sidebar.slider("Simulation Duration (months)", 6, 60, 36)
+def annual_to_monthly_rate(annual_rate):
+    """Convert an annual rate (e.g. 0.10) to equivalent monthly rate."""
+    return (1 + annual_rate) ** (1/12) - 1
 
-# --- Default Project Types ---
-def get_project_types():
-    return {
-        "Small Bet": dict(cost=0.12, duration=6, prob=0.5, payoff=0.5, tech=5, growth=50),
-        "Medium Bet": dict(cost=0.24, duration=12, prob=0.5, payoff=1.0, tech=10, growth=50),
-        "Big Bet": dict(cost=0.48, duration=24, prob=0.5, payoff=2.0, tech=20, growth=50)
-    }
 
-project_types = get_project_types()
+def load_or_default(csv_uploader, columns):
+    """
+    Read uploaded CSV or return empty DataFrame with specified columns.
+    """
+    if csv_uploader is not None:
+        df = pd.read_csv(csv_uploader, parse_dates=["start_date"]);
+        return df
+    else:
+        return pd.DataFrame(columns=columns)
 
-# --- Scenario Save/Load ---
-scenario_json = st.sidebar.text_area("📥 Paste Scenario JSON to Load (optional)")
+# -----------------------
+# Streamlit UI
+# -----------------------
 
-project_df = pd.DataFrame(columns=["Project Name", "Type", "Start Month"])
+def main():
+    st.title("Neobank Financial Simulator")
+    st.markdown("This app projects revenue, costs, and runway over the next 6 years, including customizable projects.")
 
-if scenario_json:
-    try:
-        scenario = json.loads(scenario_json)
-        project_df = pd.DataFrame(scenario['projects'])
-        cash_on_hand = scenario['cash']
-        burn_rate = scenario['burn']
-        arr = scenario['arr']
-        core_growth_rate = scenario['growth']
-        months = scenario['months']
-        st.success("Scenario loaded successfully!")
-    except Exception as e:
-        st.error(f"Failed to load scenario: {e}")
+    st.sidebar.header("1. Simulation Settings")
+    today = date.today()
+    start_date = st.sidebar.date_input("Start date", today)
+    months = st.sidebar.slider("Months to simulate", min_value=1, max_value=120, value=72)
 
-# --- Project Planning Table ---
-st.subheader("🧩 Project Planning Table")
-def default_projects():
-    return pd.DataFrame([
-        {"Project Name": "Project A", "Type": "Small Bet", "Start Month": 0},
-        {"Project Name": "Project B", "Type": "Medium Bet", "Start Month": 3},
-        {"Project Name": "Project C", "Type": "Big Bet", "Start Month": 6},
-    ])
+    st.sidebar.header("2. Base Metrics")
+    arr = st.sidebar.number_input("Current ARR ($)", min_value=0.0, value=70_000_000.0, step=1_000_000.0)
+    profit_margin = st.sidebar.slider("Gross profit margin (%)", 0.0, 100.0, 60.0) / 100
+    opex = st.sidebar.number_input("Current OPEX ($)", min_value=0.0, value=60_000_000.0, step=1_000_000.0)
+    cash0 = st.sidebar.number_input("Current cash ($)", min_value=0.0, value=70_000_000.0, step=1_000_000.0)
 
-if project_df.empty:
-    project_df = default_projects()
+    st.sidebar.markdown("---")
+    st.sidebar.header("3. Unit Economics")
+    arpu = st.sidebar.number_input("ARPU ($/year)", min_value=0.0, value=1500.0)
+    cac = st.sidebar.number_input("CAC ($)", min_value=0.0, value=500.0)
+    nrr = st.sidebar.slider("NRR (%)", 0.0, 300.0, 100.0) / 100
+    churn_first = st.sidebar.slider("Churn Yr1 (%)", 0.0, 100.0, 40.0) / 100
+    churn_later = st.sidebar.slider("Churn Yr>1 (%)", 0.0, 100.0, 5.0) / 100
 
-edited_df = st.data_editor(
-    project_df,
-    num_rows="dynamic",
-    use_container_width=True,
-    column_config={"Type": st.column_config.SelectboxColumn(options=list(project_types.keys()))}
-)
-
-# --- Save Scenario ---
-if st.button("💾 Download Scenario as JSON"):
-    scenario = {
-        "cash": cash_on_hand,
-        "burn": burn_rate,
-        "arr": arr,
-        "growth": core_growth_rate,
-        "months": months,
-        "projects": edited_df.to_dict(orient="records")
-    }
-    st.download_button("📥 Download JSON", json.dumps(scenario, indent=2), file_name="scenario.json")
-
-# --- Simulation Logic ---
-def simulate():
-    monthly_cash = []
-    monthly_revenue = []
-    monthly_burn = []
-    tech_used = []
-    
-    cash = cash_on_hand
-    revenue = arr / 12
-    
-    project_instances = []
-    for _, row in edited_df.iterrows():
-        p_type = project_types[row['Type']].copy()
-        p_type['name'] = row['Project Name']
-        p_type['type'] = row['Type']
-        p_type['start_month'] = int(row['Start Month'])
-        p_type['active'] = True
-        p_type['month'] = 0
-        project_instances.append(p_type)
-
-    for month in range(months):
-        burn = burn_rate
-        tech_this_month = tech_reserved_core
-        rev_this_month = revenue * ((1 + core_growth_rate/100) ** (month/12))
-
-        for p in project_instances:
-            if not p['active'] or month < p['start_month']:
-                continue
-            if p['month'] < p['duration']:
-                burn += p['cost']
-                tech_this_month += p['tech']
-                p['month'] += 1
-            elif p['month'] == p['duration']:
-                if p['prob'] >= 1.0:
-                    rev_this_month += p['payoff'] / 12 * ((1 + p['growth']/100) ** (month/12))
-                p['active'] = False
-
-        if tech_this_month > tech_bandwidth_total:
-            st.error(f"⚠️ Month {month+1}: Tech bandwidth exceeded ({tech_this_month}%)")
-
-        cash -= burn
-        if cash < 0:
-            st.warning(f"💸 Cash out in month {month+1}")
-            break
-
-        monthly_cash.append(cash)
-        monthly_burn.append(burn)
-        monthly_revenue.append(rev_this_month)
-        tech_used.append(tech_this_month)
-
-    return monthly_cash, monthly_burn, monthly_revenue, tech_used
-
-# --- Run Simulation ---
-if st.button("▶️ Run Simulation"):
-    cash, burn, rev, tech = simulate()
-    months_range = list(range(1, len(cash)+1))
-
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(x=months_range, y=cash, mode='lines+markers', name='Cash Remaining ($M)'))
-    fig.add_trace(go.Scatter(x=months_range, y=burn, mode='lines', name='Monthly Burn ($M)'))
-    fig.add_trace(go.Scatter(x=months_range, y=rev, mode='lines', name='Monthly Revenue ($M)'))
-    st.plotly_chart(fig, use_container_width=True)
-
-    export_df = pd.DataFrame({
-        'Month': months_range,
-        'Cash Remaining ($M)': cash,
-        'Monthly Burn ($M)': burn,
-        'Monthly Revenue ($M)': rev,
-        'Tech Bandwidth Used (%)': tech[:len(months_range)]
+    st.sidebar.markdown("---")
+    st.sidebar.header("4. Market Breakdown")
+    market_template = pd.DataFrame({
+        "market": ["Singapore", "Hong Kong"],
+        "rev_share_pct": [90, 10],
+        "growth_y1_pct": [10, 100],
+        "growth_y2_pct": [10, 100],
+        "growth_y3_pct": [10, 50],
+        "growth_y4_pct": [10, 50],
+        "growth_y5_pct": [10, 50],
     })
+    st.sidebar.markdown("Upload or edit the table below:")
+    market_df = st.sidebar.experimental_data_editor(market_template, use_container_width=True)
 
-    st.download_button("📤 Export Scenario as CSV", export_df.to_csv(index=False), file_name="runway_simulation.csv")
+    st.sidebar.markdown("---")
+    st.sidebar.header("5. Projects (CSV or edit below)")
+    market_cols = ["name","start_date","prep_months","tech_prep_cost","g_and_a_prep_cost",
+                   "cac","arpu","nrr","new_clients_y1","new_clients_y2","new_clients_y3",
+                   "new_clients_y4","new_clients_y5","cust_serv_cost","ongoing_tech_cost","ongoing_g_and_a"]
+    product_cols = ["name","start_date","prep_months","tech_prep_cost","g_and_a_prep_cost",
+                    "cac_mul","adoption_y1","adoption_y2","adoption_y3","adoption_y4","adoption_y5",
+                    "arpu_mul","nrr_mul","csc_mul","ongoing_tech_y1","ongoing_tech_y2",
+                    "ongoing_tech_y3","ongoing_tech_y4","ongoing_tech_y5",
+                    "ongoing_g_and_a_y1","ongoing_g_and_a_y2","ongoing_g_and_a_y3",
+                    "ongoing_g_and_a_y4","ongoing_g_and_a_y5"]
+    eff_cols = ["name","start_date","prep_months","tech_prep_cost","g_and_a_prep_cost",
+                "cac_mul","csc_mul","ongoing_tech_y1","ongoing_tech_y2","ongoing_tech_y3",
+                "ongoing_tech_y4","ongoing_tech_y5","ongoing_g_and_a_y1","ongoing_g_and_a_y2",
+                "ongoing_g_and_a_y3","ongoing_g_and_a_y4","ongoing_g_and_a_y5"]
+
+    new_markets = load_or_default(st.sidebar.file_uploader("New markets CSV", type="csv"), market_cols)
+    new_products = load_or_default(st.sidebar.file_uploader("New products CSV", type="csv"), product_cols)
+    eff_projects = load_or_default(st.sidebar.file_uploader("Efficiency projects CSV", type="csv"), eff_cols)
+
+    if st.sidebar.button("Run Simulation"):
+        # Build timeline
+        dates = pd.date_range(start_date, periods=months, freq='M')
+        df = pd.DataFrame(index=dates)
+
+        # Initialize metrics
+        df['clients'] = np.nan
+        df['revenue'] = np.nan
+        df['gross_profit'] = np.nan
+        df['opex'] = np.nan
+        df['burn'] = np.nan
+        df['cash'] = np.nan
+        df['arpu'] = arpu
+        df['cac'] = cac
+        df['nrr'] = nrr
+        df['csc'] = 0.0
+
+        # Base client count
+        base_clients = arr / arpu
+
+        for i, current_date in enumerate(dates):
+            month_idx = i + 1
+            # churn rate
+            monthly_churn = churn_first/12 if month_idx <= 12 else churn_later/12
+            if i == 0:
+                clients = base_clients
+            else:
+                clients = prev_clients * (1 - monthly_churn)
+                # Add growth from existing markets
+                # weighted growth by rev share and annual growth from table
+                growth_rates = []
+                for _, row in market_df.iterrows():
+                    share = row.rev_share_pct/100
+                    if month_idx <= 12:
+                        annual = row.growth_y1_pct/100
+                    elif month_idx <= 24:
+                        annual = row.growth_y2_pct/100
+                    elif month_idx <= 36:
+                        annual = row.growth_y3_pct/100
+                    elif month_idx <= 48:
+                        annual = row.growth_y4_pct/100
+                    else:
+                        annual = row.growth_y5_pct/100
+                    growth_rates.append(share * annual_to_monthly_rate(annual))
+                total_growth = sum(growth_rates)
+                clients += clients * total_growth
+
+            prev_clients = clients
+            df.at[current_date, 'clients'] = clients
+
+            # Revenue & profit
+            rev = clients * (arpu/12)
+            df.at[current_date, 'revenue'] = rev
+            df.at[current_date, 'gross_profit'] = rev * profit_margin
+
+            # Base OPEX burn
+            base_burn = opex/12 - rev * profit_margin
+
+            # TODO: add project-driven costs & revenue here
+            project_burn = 0.0
+            project_rev = 0.0
+
+            total_burn = base_burn + project_burn
+            df.at[current_date, 'burn'] = total_burn
+
+            # Cash
+            if i == 0:
+                df.at[current_date, 'cash'] = cash0 - total_burn
+            else:
+                df.at[current_date, 'cash'] = df.iloc[i-1].cash - total_burn
+
+        # Charts
+        st.header("Key Outputs Over Time")
+        st.subheader("Revenue / OPEX / Burn / Cash")
+        st.line_chart(df[['revenue','opex']])
+        st.line_chart(df[['burn','cash']])
+
+        st.subheader("Unit Metrics")
+        st.line_chart(df[['arpu','cac','nrr','csc']])
+
+        st.success("Simulation complete.\nDownload results:")
+        st.download_button("Download CSV", df.to_csv().encode(), "simulation.csv")
+
+if __name__ == "__main__":
+    main()
