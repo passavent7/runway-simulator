@@ -45,34 +45,12 @@ if st.sidebar.button('Save') and new_name:
 # How It Works
 # ─────────────────────────────────────────────────────────────────────────────
 with st.expander('How it works'):
-    st.markdown(
-        '''
-This simulator was generated from the following specification:
-
-I am the CFO of a series C business neobank. I want to build a simulator of my company's financials to understand what my revenue, costs and runway will look like based on different scenarios. Simulator to be hosted on a webpage with streamlit, coded in Python.
-
-We are contemplating a few projects to grow faster: new markets, new products, efficiency projects.
-
-Base data:
-- Cash: $70M; CoS=40%; HQ G&A $15M/yr; G&A growth 50% of revenue growth; Tech units=50/mo; Tech cost=30k; Tech growth 100% of revenue growth; HQ tech share 50%.
-
-Existing markets (editable):
-Singapore & Hong‑Kong with clients, CAC, ARPU, churn, new clients Y1–Y5, CSC, tech/mo, G&A.
-
-New Markets: Market, start, prep time, prep tech/G&A, CAC/ARPU/churn, new clients Y1–Y5, CSC, maint tech Y1–Y5, G&A Y1–Y5.
-
-New Products: Product, start, prep time, prep tech/G&A, CAC/ARPU/churn/CSC multipliers, adoption Y1–Y5, maint tech Y1–Y5, G&A Y1–Y5.
-
-Efficiency: Project, start, duration, tech/mo, CAC/CSC/tech‑cost multipliers.
-
-Click Run Simulation to project monthly over 5 years:
-- Revenue by market & filters
-- Costs by market & filters
-- Aggregated cost breakdown
-- Cash balance
-- Tech capacity
-- Key metrics
-'''    )
+    # Load the full prompt from an external markdown file
+    prompt_path = Path('instructions.md')
+    if prompt_path.exists():
+        st.markdown(prompt_path.read_text())
+    else:
+        st.warning('`instructions.md` not found. Please create this file with your full original prompt to display here.')
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Input Tables
