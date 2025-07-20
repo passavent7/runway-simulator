@@ -228,25 +228,35 @@ def simulate(inp):
     gna_month = p['hq_gna'] / 12
     cash_ser[0] = p['cash']
     tech_av[0]  = p['tech_units']
-    # Monthly loop
+        # Monthly loop
     for t in range(n):
-        arpu = np.concatenate([base['ARPU'], newm['ARPU']]).astype(float)
-        cac  = np.concatenate([base['CAC'], newm['CAC']]).astype(float)
-        csc  = np.concatenate([base['CSC'], newm['CSC']]).astype(float)
+        # Base rates arrays
+        base_arpu = np.concatenate([base['ARPU'], newm['ARPU']]).astype(float)
+        base_cac  = np.concatenate([base['CAC'], newm['CAC']]).astype(float)
+        base_csc  = np.concatenate([base['CSC'], newm['CSC']]).astype(float)
+        # Initialize rates for this month from base
+        arpu = base_arpu.copy()
+        cac  = base_cac.copy()
+        csc  = base_csc.copy()
+        # Apply product adoption effects using base values
         for j in range(len(prod)):
             frac = adopt[t, j]
-            r    = prod.loc[j]
-            arpu += frac * (r['ARPU Mult'] - 1) * arpu
-            cac  += frac * (r['CAC Mult'] - 1) * cac
-            csc  += frac * (r['CSC Mult'] - 1) * csc
+            r = prod.loc[j]
+            arpu += frac * (r['ARPU Mult'] - 1) * base_arpu
+            cac  += frac * (r['CAC Mult'] - 1) * base_cac
+            csc  += frac * (r['CSC Mult'] - 1) * base_csc
+        # Apply efficiency multipliers
         cac *= cac_eff[t]
         csc *= csc_eff[t]
+        # Compute active and new clients
         act = active[t]
         nc  = newc[t]
+        # Revenue and costs per market
         rev_mkt.iloc[t]   = act * arpu / 12
         cos_df.iloc[t]    = rev_mkt.iloc[t] * p['cos']
         acq_df.iloc[t]    = nc * cac
         serv_df.iloc[t]   = act * csc / 12
+        # Record G&A
         gna_ser[t]        = gna_month
         if t > 0:
             rev_prev = rev_mkt.iloc[t-1].sum()
@@ -254,9 +264,11 @@ def simulate(inp):
             growth   = (rev_cur - rev_prev) / max(rev_prev, 1)
             gna_month *= (1 + p['gna_share'] * growth)
             tech_av[t] = tech_av[t-1] * (1 + p['tech_share'] * growth)
+        # Tech requirement and cash update remain unchanged
         tech_req[t]      = tech_av[t] * p['hq_share']
         total_rev        = rev_mkt.iloc[t].sum()
-        total_cost       = cos_df.iloc[t].sum() + acq_df.iloc[t].sum() + serv_df.iloc[t].sum() + gna_ser[t] + tech_req[t] * p['tech_cost'] * tc_eff[t]
+        total_cost       = (cos_df.iloc[t].sum() + acq_df.iloc[t].sum() + serv_df.iloc[t].sum() +
+                             gna_ser[t] + tech_req[t] * p['tech_cost'] * tc_eff[t])
         cash_ser[t]      = cash_ser[t-1] + total_rev - total_cost if t > 0 else cash_ser[0]
     # Aggregated costs
     costs_agg = pd.DataFrame({
@@ -269,8 +281,23 @@ def simulate(inp):
     tech_df = pd.DataFrame({'available': tech_av, 'required': tech_req}, index=idxs)
     newc_sum = newc.sum(axis=1)
     denom    = np.where(newc_sum == 0, 1, newc_sum)
+        # Compute base churn metrics
+    base_churn1 = (cy1 * active).sum(axis=1) / active.sum(axis=1)
+    base_churnP = (cp  * active).sum(axis=1) / active.sum(axis=1)
+    # Compute product adoption effect on churn
+    prod_mults1 = prod['Churn1 Mult'].astype(float).values
+    prod_multsP = prod['ChurnP Mult'].astype(float).values
+    prod_effect1 = 1 + np.dot(adopt, (prod_mults1 - 1))
+    prod_effectP = 1 + np.dot(adopt, (prod_multsP - 1))
+    # Final metrics
     metrics_df = pd.DataFrame({
         'CAC': acq_df.sum(axis=1) / denom,
+        'ARPU': rev_mkt.sum(axis=1) / active.sum(axis=1) * 12,
+        # churn adjusted by product effects
+        'Churn Y1': base_churn1 * prod_effect1,
+        'Churn Post': base_churnP * prod_effectP
+    }, index=idxs)
+ / denom,
         'ARPU': rev_mkt.sum(axis=1) / active.sum(axis=1) * 12,
         'Churn Y1': (cy1 * active).sum(axis=1) / active.sum(axis=1),
         'Churn Post': (cp * active).sum(axis=1) / active.sum(axis=1)
