@@ -169,15 +169,20 @@ def simulate(inp):
             s = idx + prep + yi * 12
             e = min(s + 12, n)
             if s < n: newc[s:e, m0 + i] = ys[yi] / 12
-    # Simulate cohorts
+        # Simulate cohorts
     for t in range(1, n):
         for i in range(m0 + m1):
             prev = cohorts[t-1, i]
             curr = np.zeros(n)
             curr[0] = newc[t, i]
+            # age 1 to n-1
             for age in range(1, n):
                 rate = cy1[i] if age < 12 else cp[i]
                 curr[age] = prev[age-1] * (1 - rate)
+            # persist oldest bucket beyond horizon to prevent drop-off
+            # carry remaining from previous max-age cohort
+            rate_last = cp[i]  # post-year churn rate
+            curr[n-1] += prev[n-1] * (1 - rate_last)
             cohorts[t, i] = curr
     active = cohorts.sum(axis=2)
     # Product adoption
