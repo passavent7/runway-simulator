@@ -315,9 +315,61 @@ if st.button('Run Simulation'):
     st.subheader('Cash Balance')
     st.line_chart(cash_ser)
 
-    # Tech Capacity
-    st.subheader('Tech Capacity')
-    st.line_chart(tech_df)
+        # Tech Capacity Breakdown
+    st.subheader('Tech Capacity Breakdown')
+    # Calculate tech requirement breakdown: HQ + new markets + products + efficiency
+    dates_idx = tech_df.index
+    # HQ requirement
+    req_hq = tech_df['required']
+    breakdown = pd.DataFrame({'HQ': req_hq}, index=dates_idx)
+    # New markets maintenance
+    for i, market in enumerate(new_df['Market']):
+        # Determine start and monthly maintenance values
+        row = new_df.loc[i]
+        start_idx = (pd.to_datetime(row['Start']).year - START_DATE.year) * 12 + (pd.to_datetime(row['Start']).month - 1)
+        prep = int(row['Prep mo'])
+        maint_vals = row[['M1','M2','M3','M4','M5']].astype(float).values
+        arr = np.zeros(len(dates_idx))
+        for yi in range(5):
+            s = start_idx + prep + yi * 12
+            e = min(s + 12, len(arr))
+            if s < len(arr): arr[s:e] = maint_vals[yi]
+        breakdown[market] = arr
+    # Product maintenance
+    for j, prod_name in enumerate(prod_df['Product']):
+        row = prod_df.loc[j]
+        start_idx = (pd.to_datetime(row['Start']).year - START_DATE.year) * 12 + (pd.to_datetime(row['Start']).month - 1)
+        prep = int(row['Prep mo'])
+        maint_vals = row[['M1','M2','M3','M4','M5']].astype(float).values
+        arr = np.zeros(len(dates_idx))
+        for yi in range(5):
+            s = start_idx + prep + yi * 12
+            e = min(s + 12, len(arr))
+            if s < len(arr): arr[s:e] = maint_vals[yi]
+        breakdown[prod_name] = arr
+    # Efficiency projects tech usage
+    for k, proj in enumerate(eff_df['Project']):
+        row = eff_df.loc[k]
+        start_idx = (pd.to_datetime(row['Start']).year - START_DATE.year) * 12 + (pd.to_datetime(row['Start']).month - 1)
+        dur = int(row['Duration'])
+        arr = np.zeros(len(dates_idx))
+        end = min(start_idx + dur, len(arr))
+        if start_idx < len(arr): arr[start_idx:end] = float(row['Tech/mo'])
+        breakdown[proj] = arr
+    # Melt for Altair
+    tech_df_long = breakdown.reset_index().melt(id_vars='index', var_name='Component', value_name='Units')
+    area = alt.Chart(tech_df_long).mark_area().encode(
+        x=alt.X('index:T', title='Date'),
+        y=alt.Y('Units:Q', stack='zero', title='Tech Units Required'),
+        color=alt.Color('Component:N', title='Component')
+    ).properties(width='container', height=300)
+    # Line for total available
+    avail_df = pd.DataFrame({'index': dates_idx, 'Available': tech_df['available'].values})
+    line = alt.Chart(avail_df).mark_line(size=2).encode(
+        x='index:T',
+        y=alt.Y('Available:Q', title='Tech Units Available')
+    )
+    st.altair_chart(alt.layer(area, line), use_container_width=True)
 
     # Key Metrics (including CSC)
     st.subheader('Key Metrics')
