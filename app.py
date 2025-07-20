@@ -70,7 +70,7 @@ def main():
         })
         st.markdown("Edit your market parameters below:")
         with st.expander("Market table"):
-            market_df = st.experimental_data_editor(
+            market_df = st.data_editor(
                 market_template,
                 use_container_width=True,
                 key="market_editor"
