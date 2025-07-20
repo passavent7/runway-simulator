@@ -374,26 +374,27 @@ if st.button('Run Simulation'):
                 arr[s:e] += m
         breakdown[market] = arr
 
-    # Products prep and maintenance
-    
+        # Products prep and maintenance
     for j, prod_name in enumerate(prod_df['Product']):
         row = prod_df.loc[j]
-        start_idx = (pd.to_datetime(row['Start']).year - START_DATE.year) * 12 + (pd.to_datetime(row['Start']).month - 1)
+        # Calculate index relative to START_DATE
+        dt = pd.to_datetime(row['Start'])
+        start_idx = (dt.year - START_DATE.year) * 12 + (dt.month - START_DATE.month)
         arr = np.zeros(len(dates_idx))
         # Prep phase
         prep = int(row['Prep mo'])
-        if prep > 0:
+        if prep > 0 and start_idx >= 0:
             end_prep = min(start_idx + prep, len(arr))
-            if start_idx < len(arr):
-                arr[start_idx:end_prep] = row['Prep Tech/mo']
+            arr[start_idx:end_prep] = row['Prep Tech/mo']
         # Maintenance years 1-5
-        for yi in range(1,6):
+        for yi in range(1, 6):
             m = row[f'M{yi}']
             s = start_idx + prep + (yi-1)*12
             e = min(s + 12, len(arr))
-            if s < len(arr):
+            if 0 <= s < len(arr):
                 arr[s:e] += m
         breakdown[prod_name] = arr
+
     # Efficiency projects tech usage
     for k, proj in enumerate(eff_df['Project']):
         row = eff_df.loc[k]
