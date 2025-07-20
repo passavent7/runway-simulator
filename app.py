@@ -37,7 +37,7 @@ scenarios = load_scenarios()
 choice = st.sidebar.selectbox('Load scenario', ['(new)'] + list(scenarios.keys()))
 scenario_data = scenarios.get(choice)
 new_name = st.sidebar.text_input('Save scenario as')
-smoothing_window = st.sidebar.slider('Rolling average window (months)', 1, 12, 3)
+smoothing_window = st.sidebar.slider('Rolling average window (months)', 1, 12, 8)
 if st.sidebar.button('Save') and new_name:
     # Save current inputs
     save_scenario(new_name, st.session_state['inputs'])
