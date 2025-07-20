@@ -270,11 +270,11 @@ def simulate(inp):
         'Churn Y1': (cy1 * active).sum(axis=1) / active.sum(axis=1),
         'Churn Post': (cp * active).sum(axis=1) / active.sum(axis=1)
     }, index=idxs)
-    return rev_mkt, costs_agg, tech_df, cash_ser, metrics_df, cos_df, acq_df, serv_df
+    return rev_mkt, costs_agg, tech_df, cash_ser, metrics_df, cos_df, acq_df, serv_df, active
 
 # Run Simulation & Display
 if st.button('Run Simulation'):
-    rev_mkt, costs_agg, tech_df, cash_ser, metrics_df, cos_df, acq_df, serv_df = simulate(inputs)
+    rev_mkt, costs_agg, tech_df, cash_ser, metrics_df, cos_df, acq_df, serv_df, active = simulate(inputs)
 
     # Revenue by Market (stacked area)
     st.subheader('Revenue by Market')
@@ -314,6 +314,19 @@ if st.button('Run Simulation'):
     st.subheader('Tech Capacity')
     st.line_chart(tech_df)
 
-    # Key Metrics
+    # Key Metrics (including CSC)
     st.subheader('Key Metrics')
-    st.line_chart(metrics_df)
+    # Compute CSC metric (annual servicing cost per client)
+    metrics_df['CSC'] = (serv_df.sum(axis=1) / active.sum(axis=1)) * 12
+    metrics_fin = metrics_df[['CAC','ARPU','CSC']]
+    st.line_chart(metrics_fin)
+
+    # Churn Metrics (separate scale)
+    st.subheader('Churn Metrics')
+    metrics_churn = metrics_df[['Churn Y1','Churn Post']]
+    st.line_chart(metrics_churn)
+
+    # Total Active Clients
+    st.subheader('Total Active Clients')
+    total_clients = pd.Series(active.sum(axis=1), index=rev_mkt.index)
+    st.line_chart(total_clients)
