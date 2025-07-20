@@ -161,35 +161,52 @@ def simulate(inputs):
     # build cohorts
     cohorts = np.zeros((n, m0+m1, n))
     for i in range(m0): cohorts[0,i,12] = base.at[i,'Existing Clients']
-    # schedule new clients
-    newc = np.zeros((n,m0+m1))
+        # schedule new clients
+    newc = np.zeros((n, m0 + m1))
+    # base markets evenly spread
     for i in range(m0):
-        ys = base.loc[i,['New Y1','New Y2','New Y3','New Y4','New Y5']].astype(float).values
-        for yi in range(5): newc[yi*12:(yi+1)*12,i] = ys[yi]/12
-    for i in range(m1):
-        r=newm.loc[i]
-        idx=(pd.to_datetime(r['Start Date']).year-START_DATE.year)*12 + pd.to_datetime(r['Start Date']).month-1
-        prep=int(r['Prep mo'])
-        ys=r[['New Y1','New Y2','New Y3','New Y4','New Y5']].astype(float).values
+        ys = base.loc[i, ['New Y1','New Y2','New Y3','New Y4','New Y5']].astype(float).values
         for yi in range(5):
-            s=idx+prep+yi*12; e=min(s+12,n)
-            if s<n: newc[s:e,m0+i]=ys[yi]/12
+            start = yi * 12
+            end = start + 12
+            newc[start:end, i] = ys[yi] / 12
+    # new markets after prep
+    for i in range(m1):
+        r = newm.loc[i]
+        idx = (pd.to_datetime(r['Start Date']).year - START_DATE.year) * 12 + (pd.to_datetime(r['Start Date']).month - 1)
+        prep = int(r['Prep mo'])
+        ys = r[['New Y1','New Y2','New Y3','New Y4','New Y5']].astype(float).values
+        for yi in range(5):
+            s = idx + prep + yi * 12
+            e = min(s + 12, n)
+            if s < n:
+                newc[s:e, m0 + i] = ys[yi] / 12
+
     # simulate cohorts
+
     for t in range(1,n):
         for i in range(m0+m1):
             prev=cohorts[t-1,i]; curr=np.zeros(n); curr[0]=newc[t,i]
             for age in range(1,n): rate=churn_y1_m[i] if age<12 else churn_post_m[i]; curr[age]=prev[age-1]*(1-rate)
             cohorts[t,i]=curr
     active = cohorts.sum(axis=2)
-    # product adoption
-    adopt=np.zeros((n,len(prod)))
+        # product adoption over time
+    adopt = np.zeros((n, len(prod)))
     for j in range(len(prod)):
-        r=prod.loc[j]; idx=(pd.to_datetime(r['Start Date']).year-START_DATE.year)*12+pd.to_datetime(r['Start Date']).month-1
-        prep=int(r['Prep mo']); ys=r[['Ad1','Ad2','Ad3','Ad4','Ad5']].astype(float).values; arr=np.zeros(n)
-        for yi in range(5): s=idx+prep+yi*12; e=min(s+12,n);
-            if s<n: arr[s:e]=ys[yi]/12
-        adopt[:,j]=np.cumsum(arr)
+        r = prod.loc[j]
+        idx = (pd.to_datetime(r['Start Date']).year - START_DATE.year) * 12 + (pd.to_datetime(r['Start Date']).month - 1)
+        prep = int(r['Prep mo'])
+        ys = r[['Ad1','Ad2','Ad3','Ad4','Ad5']].astype(float).values
+        arr = np.zeros(n)
+        for yi in range(5):
+            s = idx + prep + yi * 12
+            e = min(s + 12, n)
+            if s < n:
+                arr[s:e] = ys[yi] / 12
+        adopt[:, j] = np.cumsum(arr)
+
     # efficiency multipliers
+
     eff_active=np.zeros((n,len(effp)))
     for j in range(len(effp)):
         r=effp.loc[j]; idx=(pd.to_datetime(r['Start Date']).year-START_DATE.year)*12+pd.to_datetime(r['Start Date']).month-1
