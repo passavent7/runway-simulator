@@ -37,7 +37,9 @@ scenarios = load_scenarios()
 choice = st.sidebar.selectbox('Load scenario', ['(new)'] + list(scenarios.keys()))
 scenario_data = scenarios[choice] if choice != '(new)' else None
 new_name = st.sidebar.text_input('Save scenario as')
-if st.sidebar.button('Save'): save_scenario(new_name, inputs) and st.sidebar.success(f"Saved '{new_name}'")
+if st.sidebar.button('Save') and new_name:
+    save_scenario(new_name, inputs)
+    st.sidebar.success(f"Saved '{new_name}'")
 
 # ─────────────────────────────────────────────────────────────────────────────
 # How It Works Explanation
@@ -62,7 +64,7 @@ Click **Run Simulation** to project, month-by-month over five years:
 **Original Prompt:**
 ```
 I am the CFO of a series C business neobank. I want to build a simulator of my company's financials to understand what 
-my revenue, costs and runway will look like based on different scenarios. Simulator in Streamlit, Python. ...
+my revenue, costs and runway will look like based on different scenarios. ...
 ```"""
     )
 
@@ -83,7 +85,7 @@ with col2:
     gna_share = st.slider('HQ G&A growth share', 0.0, 1.0, 0.5)
     tech_share = st.slider('Tech capacity growth share', 0.0, 1.0, 1.0)
 
-# 2) Existing Markets (fixed rows)
+# 2) Existing Markets
 st.header('Existing Markets')
 base_cols = ['Market','Existing Clients','CAC','ARPU','NRR',
              'Churn Y1','Churn Post Y1',
@@ -125,7 +127,7 @@ eff_cols = ['Project','Start Date','Duration','Tech/mo','CAC Mult','CSC Mult','T
 eff_df = pd.DataFrame(columns=eff_cols)
 eff_df = st.data_editor(eff_df, key='eff', num_rows='dynamic')
 
-# Filters for display
+# Filters
 st.sidebar.title('Filters')
 mkt_list = list(base_df['Market']) + list(new_df['Market'])
 sel_mkt = st.sidebar.multiselect('Markets', mkt_list, default=mkt_list)
@@ -135,7 +137,7 @@ eff_list = list(eff_df['Project'])
 sel_eff = st.sidebar.multiselect('Efficiency', eff_list, default=eff_list)
 
 # Gather inputs
-def gather():
+def gather_inputs():
     return {
         'base': base_df.to_dict('list'),
         'new': new_df.to_dict('list'),
@@ -152,38 +154,40 @@ def gather():
             'tech_share': tech_share
         }
     }
-inputs = gather()
+inputs = gather_inputs()
 
-# Simulation logic same as before (cohorts, adoption, efficiency, financials)
-def simulate(inputs):
-    # Full cohort-based simulation using inputs...
-    # Returns: rev_mkt, costs_agg, tech_df, cash_series, metrics_df, cos_df, acq_df, serv_df
-    pass
+# Simulation logic stub
+# def simulate(inputs):
+#     ...
+#     return rev_mkt, costs_agg, tech_df, cash_series, metrics_df, cos_df, acq_df, serv_df
 
-# Run & Display\if st.button('Run Simulation'):
+# ─────────────────────────────────────────────────────────────────────────────
+# Run & Display
+# ─────────────────────────────────────────────────────────────────────────────
+if st.button('Run Simulation'):
     rev_mkt, costs_agg, tech_df, cash_series, metrics_df, cos_df, acq_df, serv_df = simulate(inputs)
 
     # Revenue by market filtered
     st.subheader('Revenue by Market')
     st.line_chart(rev_mkt[sel_mkt])
 
-    # Costs by market filtered
+    # Costs by market
     st.subheader('Costs by Market')
     total_costs = cos_df + acq_df + serv_df
     st.area_chart(total_costs[sel_mkt])
 
-    # Aggregated Costs Breakdown
+    # Aggregated costs breakdown
     st.subheader('Aggregated Costs Breakdown')
     st.area_chart(costs_agg)
 
-    # Cash Balance
+    # Cash balance
     st.subheader('Cash Balance')
     st.line_chart(cash_series)
 
-    # Tech Capacity
+    # Tech capacity
     st.subheader('Tech Capacity')
     st.line_chart(tech_df)
 
-    # Key Metrics
+    # Key metrics
     st.subheader('Key Metrics')
     st.line_chart(metrics_df)
