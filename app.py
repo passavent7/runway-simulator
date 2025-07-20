@@ -42,8 +42,7 @@ def main():
             1. Base metrics: ARR, profit margin, OPEX, cash on hand.
             2. Unit economics: ARPU, CAC, NRR, and churn assumptions.
             3. Existing markets: enter parameters like launch date, prep costs, unit metrics, and client additions.
-            4. Growth table: annual growth rates by existing market share.
-            5. Projects: tables for new markets, products, and efficiency initiatives (editable directly or via CSV).
+            4. Projects: tables for new markets, products, and efficiency initiatives (editable directly or via CSV).
 
             **Simulation**
             - Derives starting client count = ARR / ARPU.
@@ -112,25 +111,7 @@ def main():
             )
 
         st.markdown("---")
-        st.header("4. Growth by Market")
-        growth_template = pd.DataFrame({
-            "market": ["Singapore", "Hong Kong"],
-            "rev_share_pct": [90, 10],
-            "growth_y1_pct": [10, 100],
-            "growth_y2_pct": [10, 100],
-            "growth_y3_pct": [10, 50],
-            "growth_y4_pct": [10, 50],
-            "growth_y5_pct": [10, 50],
-        })
-        with st.expander("Edit growth assumptions"):
-            growth_df = st.data_editor(
-                growth_template,
-                use_container_width=True,
-                key="growth_table"
-            )
-
-        st.markdown("---")
-        st.header("5. Projects")
+        st.header("4. Projects")
         # Define columns
         market_cols = [
             "name","start_date","prep_months","tech_prep_cost","g_and_a_prep_cost",
