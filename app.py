@@ -46,7 +46,7 @@ st.title('Runway & Financial Simulator for Business Neobank')
 if st.button('How it works'):
     st.markdown('## How it works:')
     st.markdown(
-        """
+        '''
 This simulator lets you define:
 
 - **Base parameters** (cash, cost structure, tech bandwidth, G&A growth)
@@ -62,7 +62,8 @@ Then hit **Run Simulation** to project, month-by-month over 5 years:
 - Key metrics (CAC, ARPU, NRR, churn, CSC)
 
 **Original specification used to generate this app:**
-```text
+
+```
 I am the CFO of a series C business neobank. I want to build a simulator of my company's financials to understand what my revenue, costs and runway will look like based on different scenarios.
 Simulator to be hosted on a webpage with streamlit, coded in Python.
 
@@ -72,26 +73,65 @@ We are contemplating a few projects to grow faster. Typically 3 kinds of project
 - Efficiency increase projects - to lower our CAC and CSC (Customer Servicing Costs).
 
 Each of these 3 types of projects has different types of parameters.
-... (full prompt continues) ...
-```"""
+For new markets:
+- Market name
+- Project start date
+- Time needed to prepare the launch (in months)
+- Tech Bandwidth units to prepare launch (per month)
+- G&A Cost for launch preparation (per month)
+- CAC ($)
+- ARPU ($)
+- Churn Year 1
+- Churn post Year 1
+- New clients in Year 1, 2, 3, 4, 5 (linear progression each month)
+- CSC ($ per client per year)
+- Tech Bandwidth units for maintenance (per month) - Y1, Y2, Y3, Y4, Y5
+- Ongoing G&A cost ($ per year) - Y1, Y2, Y3, Y4, Y5
+
+For new Products:
+- Product name
+- Project start date
+- Time needed to prepare the launch (in months)
+- Tech Bandwidth units during launch preparation (per month)
+- G&A cost for launch preparation (per month)
+- CAC multiplier (applies to all clients)
+- ARPU multiplier (applies only to clients using product)
+- Churn Year 1 multiplier (applies only to clients using product)
+- Churn post Year 1 multiplier (applies only to clients using product)
+- CSC multiplier (applies only to clients using product)
+- Adoption Y1–Y5 (% of existing client base, monthly ramp)
+- Tech units for maintenance Y1–Y5 (units/mo)
+- Ongoing G&A Y1–Y5 (USD/yr)
+
+For Efficiency Projects:
+- Project name
+- Project start date
+- Duration (months)
+- Tech units required/mo
+- CAC multiplier
+- CSC multiplier
+- Tech unit cost multiplier
+
+Start simulation from July 2025, 5‑year horizon. Monthly churn constant. Save/load scenarios. No external inflows/outflows. Warn if tech capacity exceeded.
+```'''
     )
 
 # --- Inputs ---
-# 1) Base parameters
+# 1) Base Parameters
 st.header('Base Parameters')
 col1, col2 = st.columns(2)
 with col1:
-    cash_start = st.number_input('Cash in bank (USD)', value=70_000_000, step=1_000_000)
+    cash_start = st.number_input('Cash in bank (USD)', value=70_000_000)
     cos_pct = st.slider('Cost of Sales (% of Revenue)', 0.0, 1.0, 0.4)
-    hq_gna_start = st.number_input('HQ G&A annual (USD)', value=15_000_000, step=500_000)
+    hq_gna_start = st.number_input('HQ G&A annual (USD)', value=15_000_000)
     hq_share = st.slider('HQ tech bandwidth share (%)', 0.0, 1.0, 0.5)
 with col2:
-    tech_units_start = st.number_input('Tech units available per month', value=50, step=1)
-    tech_unit_cost_start = st.number_input('Tech unit cost (USD)', value=30_000, step=1_000)
+    tech_units_start = st.number_input('Tech units available per month', value=50)
+    tech_unit_cost_start = st.number_input('Tech unit cost (USD)', value=30_000)
     gna_growth_share = st.slider('HQ G&A growth share of revenue growth (%)', 0.0, 1.0, 0.5)
     tech_growth_share = st.slider('Tech capacity growth share of revenue growth (%)', 0.0, 1.0, 1.0)
 
-# 2) Existing Markets
+# 2) Existing Markets (fixed rows)
 st.header('Existing Markets (Base)')
 base_markets_cols = [
     'Market','Existing Clients','CAC','ARPU','NRR',
@@ -105,30 +145,24 @@ base_markets_df = pd.DataFrame([
 ], columns=base_markets_cols)
 base_markets_df = st.data_editor(base_markets_df, key='base_markets', num_rows='fixed')
 
-# 3) New Markets
+# 3) New Markets (dynamic rows)
 st.header('New Markets')
 new_markets_cols = [
     'Market','Start Date','Prep Duration (mo)',
     'Prep Tech/mo','Prep G&A/mo',
     'CAC','ARPU','Churn Y1','Churn Post Y1',
     'New Clients Y1','New Clients Y2','New Clients Y3','New Clients Y4','New Clients Y5',
-    'CSC',
-    'Maint Tech Y1','Maint Tech Y2','Maint Tech Y3','Maint Tech Y4','Maint Tech Y5',
+    'CSC','Maint Tech Y1','Maint Tech Y2','Maint Tech Y3','Maint Tech Y4','Maint Tech Y5',
     'Ongoing G&A Y1','Ongoing G&A Y2','Ongoing G&A Y3','Ongoing G&A Y4','Ongoing G&A Y5'
 ]
 new_markets_df = pd.DataFrame(columns=new_markets_cols)
 new_markets_df.loc[0] = [
-    'United States','2025-08-01',0,
-    0,0,
-    1000,2000,0.3,0.1,
-    1000,3000,10000,25000,50000,
-    300,
-    3,4,5,6,7,
-    1_000_000,2_000_000,3_000_000,4_000_000,5_000_000
+    'United States','2025-08-01',0,0,0,1000,2000,0.3,0.1,
+    1000,3000,10000,25000,50000,300,3,4,5,6,7,1_000_000,2_000_000,3_000_000,4_000_000,5_000_000
 ]
 new_markets_df = st.data_editor(new_markets_df, key='new_markets', num_rows='dynamic')
 
-# 4) New Products
+# 4) New Products (dynamic rows)
 st.header('New Products')
 new_products_cols = [
     'Product','Start Date','Prep Duration (mo)',
@@ -140,29 +174,24 @@ new_products_cols = [
 ]
 new_products_df = pd.DataFrame(columns=new_products_cols)
 new_products_df.loc[0] = [
-    'AI Accounting','2025-07-01',6,
-    2,20000,
-    0.95,1.3,0.9,0.9,1.2,
-    0.02,0.05,0.10,0.20,0.30,
-    3,3,3,3,3,
-    250000,500000,750000,1000000,1500000
+    'AI Accounting','2025-07-01',6,2,20000,
+    0.95,1.3,0.9,0.9,1.2,0.02,0.05,0.10,0.20,0.30,3,3,3,3,3,250000,500000,750000,1000000,1500000
 ]
 new_products_df = st.data_editor(new_products_df, key='new_products', num_rows='dynamic')
 
-# 5) Efficiency Projects
+# 5) Efficiency Projects (dynamic rows)
 st.header('Efficiency Projects')
-eff_cols = ['Project','Start Date','Duration (mo)',
-            'Tech Units/mo','CAC Mult','CSC Mult','Tech Unit Cost Mult']
+eff_cols = ['Project','Start Date','Duration (mo)','Tech Units/mo','CAC Mult','CSC Mult','Tech Unit Cost Mult']
 eff_df = pd.DataFrame(columns=eff_cols)
 eff_df = st.data_editor(eff_df, key='efficiency', num_rows='dynamic')
 
-# Gather inputs for saving or simulation
+# Gather inputs
 def gather_inputs():
     return {
-        'base': base_markets_df.to_dict(orient='list'),
-        'new_markets': new_markets_df.to_dict(orient='list'),
-        'new_products': new_products_df.to_dict(orient='list'),
-        'efficiency': eff_df.to_dict(orient='list'),
+        'base': base_markets_df.to_dict('list'),
+        'new_markets': new_markets_df.to_dict('list'),
+        'new_products': new_products_df.to_dict('list'),
+        'efficiency': eff_df.to_dict('list'),
         'params': {
             'cash_start': cash_start,
             'cos_pct': cos_pct,
@@ -178,6 +207,20 @@ def gather_inputs():
 current_inputs = gather_inputs()
 if save_btn and new_name:
     save_scenario(new_name, current_inputs)
-    st.sidebar.success(f'Scenario "{new_name}" saved')
+    st.sidebar.success(f"Scenario '{new_name}' saved")
 
-# Note: Simulation and display logic unchanged...
+# Simulation stub
+```python
+# def simulate(inputs):
+#     ...
+#     return results
+```
+
+# Run Simulation button
+if st.button('Run Simulation'):
+    st.write('Running simulation...')
+    # results = simulate(current_inputs)
+    # st.line_chart(results['revenue'])
+    st.success('Simulation complete!')
+
+# End of app
