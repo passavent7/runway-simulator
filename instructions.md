@@ -57,7 +57,7 @@ I the output of the simulator, I want to see, on different graphs, the month on 
 - Total Tech bandwidth units available
 - Total Tech bandwidth units required
 - Cash in the bank 
-- All key metrics: CAC, ARPU, NRR, CSC, Churn year 1, Churn post year 1 (especially as the launch of new products and efficiency projects impact them)
+- All key metrics: CAC, ARPU, NRR, CSC, Churn year 1, Churn post year 1, Cost per Tech Bandwidth Unit (especially as the launch of new products and efficiency projects impact them)
 
 For Revenue and Cost, have views showing contribution of each Market and Product.
 For Costs, have a view showing breakdown by type of cost (CoS, G&A, Tech, Acquisition, Servicing)
