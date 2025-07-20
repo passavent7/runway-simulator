@@ -337,44 +337,77 @@ if st.button('Run Simulation'):
     st.subheader('Cash Balance')
     st.line_chart(cash_ser)
 
-    # Tech Capacity Breakdown
+        # Tech Capacity Breakdown
     st.subheader('Tech Capacity Breakdown')
     dates_idx = tech_df.index
     breakdown = pd.DataFrame({'HQ': tech_df['required']}, index=dates_idx)
-    for i, market in enumerate(base_df['Market']): breakdown[market] = base_df.loc[i, 'Tech/mo']
+    # Existing markets
+    for i, market in enumerate(base_df['Market']):
+        breakdown[market] = base_df.loc[i, 'Tech/mo']
+
+    # New markets
     for i, market in enumerate(new_df['Market']):
         row = new_df.loc[i]
         dt = pd.to_datetime(row['Start'])
-        start_idx = (dt.year - START_DATE.year)*12 + (dt.month - START_DATE.month)
+        start_idx = (dt.year - START_DATE.year) * 12 + (dt.month - START_DATE.month)
         arr = np.zeros(len(dates_idx))
         prep = int(row['Prep mo'])
-        if prep>0 and start_idx>=0:
-            end_prep = min(start_idx+prep, len(arr)); arr[start_idx:end_prep] = row['Prep Tech/mo']
-        for yi in range(1,6):
-            m = row[f'M{yi}']; s = start_idx + prep + (yi-1)*12; e = min(s+12, len(arr))
-            if 0 <= s < len(arr): arr[s:e] += m
+        if prep > 0 and start_idx >= 0:
+            end_prep = min(start_idx + prep, len(arr))
+            arr[start_idx:end_prep] = row['Prep Tech/mo']
+        for yi in range(1, 6):
+            m = row[f'M{yi}']
+            s = start_idx + prep + (yi - 1) * 12
+            e = min(s + 12, len(arr))
+            if 0 <= s < len(arr):
+                arr[s:e] += m
         breakdown[market] = arr
+
+    # Products
     for j, prod_name in enumerate(prod_df['Product']):
-        row = prod_df.loc[j]; dt = pd.to_datetime(row['Start'])
-        start_idx = (dt.year - START_DATE.year)*12 + (dt.month - START_DATE.month)
-        arr = np.zeros(len(dates_idx)); prep = int(row['Prep mo'])
-        if prep>0 and start_idx>=0:
-            end_prep = min(start_idx+prep, len(arr)); arr[start_idx:end_prep] = row['Prep Tech/mo']
-        for yi in range(1,6): m = row[f'M{yi}']; s = start_idx+prep+(yi-1)*12; e = min(s+12,len(arr))
-            if 0<=s<len(arr): arr[s:e]+=m
+        row = prod_df.loc[j]
+        dt = pd.to_datetime(row['Start'])
+        start_idx = (dt.year - START_DATE.year) * 12 + (dt.month - START_DATE.month)
+        arr = np.zeros(len(dates_idx))
+        prep = int(row['Prep mo'])
+        if prep > 0 and start_idx >= 0:
+            end_prep = min(start_idx + prep, len(arr))
+            arr[start_idx:end_prep] = row['Prep Tech/mo']
+        for yi in range(1, 6):
+            m = row[f'M{yi}']
+            s = start_idx + prep + (yi - 1) * 12
+            e = min(s + 12, len(arr))
+            if 0 <= s < len(arr):
+                arr[s:e] += m
         breakdown[prod_name] = arr
+
+    # Efficiency projects
     for k, proj in enumerate(eff_df['Project']):
-        row = eff_df.loc[k]; start_idx = (pd.to_datetime(row['Start']).year-START_DATE.year)*12+(pd.to_datetime(row['Start']).month-1)
-        dur = int(row['Duration']); arr = np.zeros(len(dates_idx)); end = min(start_idx+dur,len(arr))
-        if start_idx < len(arr): arr[start_idx:end] = row['Tech/mo']
+        row = eff_df.loc[k]
+        dt = pd.to_datetime(row['Start'])
+        start_idx = (dt.year - START_DATE.year) * 12 + (dt.month - START_DATE.month)
+        arr = np.zeros(len(dates_idx))
+        dur = int(row['Duration'])
+        end = min(start_idx + dur, len(arr))
+        if start_idx >= 0:
+            arr[start_idx:end] = row['Tech/mo']
         breakdown[proj] = arr
+
     tech_long = breakdown.reset_index().melt(id_vars='index', var_name='Component', value_name='Units')
-    tech_area = alt.Chart(tech_long).mark_area().encode(x='index:T', y='Units:Q', color='Component:N')
+    tech_area = alt.Chart(tech_long).mark_area().encode(
+        x='index:T',
+        y='Units:Q',
+        color='Component:N'
+    ).properties(width='container', height=300)
     avail_df = pd.DataFrame({'index': dates_idx, 'Available': tech_df['available']})
-    avail_line = alt.Chart(avail_df).mark_line(size=2).encode(x='index:T', y='Available:Q')
+    avail_line = alt.Chart(avail_df).mark_line(size=2).encode(
+        x='index:T',
+        y='Available:Q'
+    )
     st.altair_chart(alt.layer(tech_area, avail_line), use_container_width=True)
 
     # Key Metrics
+
     st.subheader('Key Metrics')
     st.line_chart(metrics_df[['CAC','ARPU','CSC']])
 
