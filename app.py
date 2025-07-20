@@ -73,11 +73,9 @@ base_markets_df = pd.DataFrame(
         ['Hong-Kong', 10000, 500, 1500, 1.0, 0.3, 0.05, 1000,3000,6000,10000,15000, 200, 4, 2_000_000]
     ], columns=base_markets_cols
 )
-# Use st.data_editor without num_rows kwarg
 base_markets_df = st.data_editor(
     base_markets_df,
-    key='base_markets',
-    help='Core markets where we are live. Churn and new clients per year.'
+    key='base_markets'
 )
 
 # 3) New Markets
@@ -103,8 +101,7 @@ new_markets_df.loc[0] = [
 ]
 new_markets_df = st.data_editor(
     new_markets_df,
-    key='new_markets',
-    help='Launch parameters for new regions. New clients per year spread evenly.'
+    key='new_markets'
 )
 
 # 4) New Products
@@ -128,8 +125,7 @@ new_products_df.loc[0] = [
 ]
 new_products_df = st.data_editor(
     new_products_df,
-    key='new_products',
-    help='Parameters for product launches. Adoption as fraction of base clients.'
+    key='new_products'
 )
 
 # 5) Efficiency Projects
@@ -141,8 +137,7 @@ eff_cols = [
 eff_df = pd.DataFrame(columns=eff_cols)
 eff_df = st.data_editor(
     eff_df,
-    key='efficiency',
-    help='Bets to lower CAC, CSC, and tech cost.'
+    key='efficiency'
 )
 
 # Gather inputs for saving or simulation
