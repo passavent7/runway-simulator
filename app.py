@@ -3,6 +3,9 @@ import pandas as pd
 import numpy as np
 from datetime import date
 
+# Set wide layout so input pane can extend full page width
+st.set_page_config(page_title="Neobank Financial Simulator", layout="wide")
+
 # -----------------------
 # Helper functions
 # -----------------------
@@ -41,7 +44,7 @@ def main():
             **Inputs**
             1. Base metrics: ARR, profit margin, OPEX, cash on hand.
             2. Unit economics: ARPU, CAC, NRR, and churn assumptions.
-            3. Existing markets: enter parameters like launch date, prep costs, unit metrics, and client additions.
+            3. Existing markets: parameters like launch date, prep costs, unit metrics, and client additions.
             4. Projects: tables for new markets, products, and efficiency initiatives (editable directly or via CSV).
 
             **Simulation**
@@ -52,27 +55,23 @@ def main():
             - Tracks cash balance month by month until depletion.
 
             **Limitations**
-            - Project impacts are placeholders; you’ll need to add logic for ongoing costs and revenue from projects.
+            - Project impacts are placeholders; add logic for ongoing costs and revenue from projects.
             - Assumes linear prep-cost allocation and flat unit economics outside project scope.
             - Does not model CAPEX or non-operating income/expenses.
-
             """
         )
         return
 
-    st.markdown(
-        "Simplify scenario planning by editing inputs in the sidebar and clicking **Run Simulation**."
-    )
+    st.markdown("Simplify scenario planning by editing inputs in the sidebar and clicking **Run Simulation**.")
 
-    # Sidebar inputs
+    # Sidebar inputs (now wide)
     with st.sidebar:
-        st.header("1. Simulation Settings")
+        st.header("1. Simulation Settings & Inputs")
         today = date.today()
         start_date = st.date_input("Start date", today)
         months = st.slider("Months to simulate", 1, 120, 72)
 
-        st.markdown("---")
-        st.header("2. Base Metrics & Unit Economics")
+        st.subheader("Base Metrics & Unit Economics")
         arr = st.number_input("Current ARR ($)", 0.0, 1e9, 70_000_000.0, step=1_000_000.0)
         profit_margin = st.slider("Gross profit margin (%)", 0.0, 100.0, 60.0) / 100
         opex = st.number_input("Current OPEX ($/year)", 0.0, 1e9, 60_000_000.0, step=1_000_000.0)
@@ -84,7 +83,7 @@ def main():
         churn_later = st.slider("Churn Yr>1 (%)", 0.0, 100.0, 5.0) / 100
 
         st.markdown("---")
-        st.header("3. Existing Markets")
+        st.subheader("Existing Markets")
         existing_markets_template = pd.DataFrame({
             "name": ["Singapore", "Hong Kong"],
             "start_date": [today, today],
@@ -103,16 +102,10 @@ def main():
             "ongoing_tech_cost": [0.0, 0.0],
             "ongoing_g_and_a": [0.0, 0.0],
         })
-        with st.expander("Edit existing-market parameters"):
-            existing_markets = st.data_editor(
-                existing_markets_template,
-                use_container_width=True,
-                key="existing_markets"
-            )
+        existing_markets = st.data_editor(existing_markets_template, use_container_width=True, key="existing_markets")
 
         st.markdown("---")
-        st.header("4. Projects")
-        # Define columns
+        st.subheader("Projects")
         market_cols = [
             "name","start_date","prep_months","tech_prep_cost","g_and_a_prep_cost",
             "cac","arpu","nrr","new_clients_y1","new_clients_y2","new_clients_y3",
@@ -134,30 +127,16 @@ def main():
             "ongoing_g_and_a_y1","ongoing_g_and_a_y2","ongoing_g_and_a_y3",
             "ongoing_g_and_a_y4","ongoing_g_and_a_y5"
         ]
-
-        # New Markets
-        st.subheader("New-Market Launches")
-        new_markets_csv = st.file_uploader("Upload CSV for new markets", type="csv")
-        new_markets_df = load_or_default(new_markets_csv, market_cols)
+        new_markets_df = load_or_default(st.file_uploader("New markets CSV", type="csv"), market_cols)
         new_markets = st.data_editor(new_markets_df, use_container_width=True, key="new_markets_editor")
-
-        # New Products
-        st.subheader("New-Product Launches")
-        new_products_csv = st.file_uploader("Upload CSV for new products", type="csv")
-        new_products_df = load_or_default(new_products_csv, product_cols)
+        new_products_df = load_or_default(st.file_uploader("New products CSV", type="csv"), product_cols)
         new_products = st.data_editor(new_products_df, use_container_width=True, key="new_products_editor")
-
-        # Efficiency Projects
-        st.subheader("Efficiency Initiatives")
-        eff_csv = st.file_uploader("Upload CSV for efficiency projects", type="csv")
-        eff_projects_df = load_or_default(eff_csv, eff_cols)
+        eff_projects_df = load_or_default(st.file_uploader("Efficiency CSV", type="csv"), eff_cols)
         eff_projects = st.data_editor(eff_projects_df, use_container_width=True, key="eff_projects_editor")
 
-        st.markdown("---")
         run_button = st.button("Run Simulation")
 
     if run_button:
-        # Simulation logic placeholder
         st.success("Simulation logic to be implemented with project impacts.")
 
 if __name__ == "__main__":
