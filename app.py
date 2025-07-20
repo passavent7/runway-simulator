@@ -351,13 +351,71 @@ if st.button('Run Simulation'):
     # HQ requirement
     req_hq = tech_df['required']
     breakdown = pd.DataFrame({'HQ': req_hq}, index=dates_idx)
-        # Include existing markets tech requirement
+            # Include existing markets tech requirement
     for i, market in enumerate(base_df['Market']):
         # constant monthly tech usage per existing market
         units = base_df.loc[i, 'Tech/mo']
         breakdown[market] = np.full(len(dates_idx), units)
 
+    # New markets prep tech (during preparation)
+    for i, market in enumerate(new_df['Market']):
+        row = new_df.loc[i]
+        start_idx = (pd.to_datetime(row['Start']).year - START_DATE.year) * 12 + (pd.to_datetime(row['Start']).month - 1)
+        prep = int(row['Prep mo'])
+        arr_prep = np.zeros(len(dates_idx))
+        end_prep = min(start_idx + prep, len(arr_prep))
+        if start_idx < len(arr_prep):
+            arr_prep[start_idx:end_prep] = row['Prep Tech/mo']
+        breakdown[market] = arr_prep
+
     # New markets maintenance
+    for i, market in enumerate(new_df['Market']):
+        row = new_df.loc[i]
+        start_idx = (pd.to_datetime(row['Start']).year - START_DATE.year) * 12 + (pd.to_datetime(row['Start']).month - 1)
+        prep = int(row['Prep mo'])
+        maint_vals = row[['M1','M2','M3','M4','M5']].astype(float).values
+        arr_maint = np.zeros(len(dates_idx))
+        for yi in range(5):
+            s = start_idx + prep + yi * 12
+            e = min(s + 12, len(arr_maint))
+            if s < len(arr_maint): arr_maint[s:e] = maint_vals[yi]
+        breakdown[market] += arr_maint
+
+    # New products prep tech (during preparation)
+    for j, prod_name in enumerate(prod_df['Product']):
+        row = prod_df.loc[j]
+        start_idx = (pd.to_datetime(row['Start']).year - START_DATE.year) * 12 + (pd.to_datetime(row['Start']).month - 1)
+        prep = int(row['Prep mo'])
+        arr_prep = np.zeros(len(dates_idx))
+        end_prep = min(start_idx + prep, len(arr_prep))
+        if start_idx < len(arr_prep):
+            arr_prep[start_idx:end_prep] = row['Prep Tech/mo']
+        breakdown[prod_name] = arr_prep
+
+    # Product maintenance
+    for j, prod_name in enumerate(prod_df['Product']):
+        row = prod_df.loc[j]
+        start_idx = (pd.to_datetime(row['Start']).year - START_DATE.year) * 12 + (pd.to_datetime(row['Start']).month - 1)
+        prep = int(row['Prep mo'])
+        maint_vals = row[['M1','M2','M3','M4','M5']].astype(float).values
+        arr_maint = np.zeros(len(dates_idx))
+        for yi in range(5):
+            s = start_idx + prep + yi * 12
+            e = min(s + 12, len(arr_maint))
+            if s < len(arr_maint): arr_maint[s:e] = maint_vals[yi]
+        breakdown[prod_name] += arr_maint
+
+    # Efficiency projects tech usage
+    for k, proj in enumerate(eff_df['Project']):
+        row = eff_df.loc[k]
+        start_idx = (pd.to_datetime(row['Start']).year - START_DATE.year) * 12 + (pd.to_datetime(row['Start']).month - 1)
+        dur = int(row['Duration'])
+        arr = np.zeros(len(dates_idx))
+        end = min(start_idx + dur, len(arr))
+        if start_idx < len(arr): arr[start_idx:end] = float(row['Tech/mo'])
+        breakdown[proj] = arr
+    # Melt for Altair
+
     for i, market in enumerate(new_df['Market']):
         # Determine start and monthly maintenance values
         row = new_df.loc[i]
