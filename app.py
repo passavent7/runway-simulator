@@ -63,7 +63,6 @@ Then hit **Run Simulation** to project, month-by-month over 5 years:
 
 **Original specification used to generate this app:**
 
-```
 I am the CFO of a series C business neobank. I want to build a simulator of my company's financials to understand what my revenue, costs and runway will look like based on different scenarios.
 Simulator to be hosted on a webpage with streamlit, coded in Python.
 
@@ -73,48 +72,8 @@ We are contemplating a few projects to grow faster. Typically 3 kinds of project
 - Efficiency increase projects - to lower our CAC and CSC (Customer Servicing Costs).
 
 Each of these 3 types of projects has different types of parameters.
-For new markets:
-- Market name
-- Project start date
-- Time needed to prepare the launch (in months)
-- Tech Bandwidth units to prepare launch (per month)
-- G&A Cost for launch preparation (per month)
-- CAC ($)
-- ARPU ($)
-- Churn Year 1
-- Churn post Year 1
-- New clients in Year 1, 2, 3, 4, 5 (linear progression each month)
-- CSC ($ per client per year)
-- Tech Bandwidth units for maintenance (per month) - Y1, Y2, Y3, Y4, Y5
-- Ongoing G&A cost ($ per year) - Y1, Y2, Y3, Y4, Y5
-
-For new Products:
-- Product name
-- Project start date
-- Time needed to prepare the launch (in months)
-- Tech Bandwidth units during launch preparation (per month)
-- G&A cost for launch preparation (per month)
-- CAC multiplier (applies to all clients)
-- ARPU multiplier (applies only to clients using product)
-- Churn Year 1 multiplier (applies only to clients using product)
-- Churn post Year 1 multiplier (applies only to clients using product)
-- CSC multiplier (applies only to clients using product)
-- Adoption Y1–Y5 (% of existing client base, monthly ramp)
-- Tech units for maintenance Y1–Y5 (units/mo)
-- Ongoing G&A Y1–Y5 (USD/yr)
-
-For Efficiency Projects:
-- Project name
-- Project start date
-- Duration (months)
-- Tech units required/mo
-- CAC multiplier
-- CSC multiplier
-- Tech unit cost multiplier
-
-Start simulation from July 2025, 5‑year horizon. Monthly churn constant. Save/load scenarios. No external inflows/outflows. Warn if tech capacity exceeded.
-```'''
-    )
+... (full detailed prompt)
+'''    )
 
 # --- Inputs ---
 # 1) Base Parameters
@@ -209,12 +168,10 @@ if save_btn and new_name:
     save_scenario(new_name, current_inputs)
     st.sidebar.success(f"Scenario '{new_name}' saved")
 
-# Simulation stub
-```python
+# Simulation stub (uncomment and implement)
 # def simulate(inputs):
 #     ...
 #     return results
-```
 
 # Run Simulation button
 if st.button('Run Simulation'):
