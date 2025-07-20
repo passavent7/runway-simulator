@@ -233,15 +233,43 @@ def simulate(inp):
 # Run Simulation & Display
 if st.button('Run Simulation'):
     rev_mkt, costs_agg, tech_df, cash_ser, metrics_df, cos_df, acq_df, serv_df = simulate(inputs)
+
+    # Revenue by market
     st.subheader('Revenue by Market')
     st.line_chart(rev_mkt[sel_mkt])
+
+    # Costs by Market (stacked area)
     st.subheader('Costs by Market')
-    st.area_chart((cos_df+acq_df+serv_df)[sel_mkt])
-    st.subheader('Aggregated Costs')
-    st.area_chart(costs_agg)
+    # Prepare a long-form DataFrame for Altair
+    cost_mkt_df = (cos_df + acq_df + serv_df)[sel_mkt].reset_index().melt(
+        id_vars='index', var_name='Market', value_name='Cost'
+    )
+    import altair as alt
+    cost_chart = alt.Chart(cost_mkt_df).mark_area().encode(
+        x=alt.X('index:T', title='Date'),
+        y=alt.Y('Cost:Q', stack='zero', title='Cost (USD)'),
+        color=alt.Color('Market:N', title='Market')
+    ).properties(width='container', height=300)
+    st.altair_chart(cost_chart, use_container_width=True)
+
+    # Aggregated Costs Breakdown (stacked area)
+    st.subheader('Aggregated Costs Breakdown')
+    agg_df = costs_agg.reset_index().melt(id_vars='index', var_name='Cost Type', value_name='Amount')
+    agg_chart = alt.Chart(agg_df).mark_area().encode(
+        x=alt.X('index:T', title='Date'),
+        y=alt.Y('Amount:Q', stack='zero', title='Amount (USD)'),
+        color=alt.Color('Cost Type:N', title='Cost Type')
+    ).properties(width='container', height=300)
+    st.altair_chart(agg_chart, use_container_width=True)
+
+    # Cash Balance
     st.subheader('Cash Balance')
     st.line_chart(cash_ser)
+
+    # Tech Capacity
     st.subheader('Tech Capacity')
     st.line_chart(tech_df)
+
+    # Key Metrics
     st.subheader('Key Metrics')
     st.line_chart(metrics_df)
